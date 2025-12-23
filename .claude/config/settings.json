@@ -1,0 +1,83 @@
+{
+  "$schema": "./settings-schema.json",
+  "version": "2.0.0",
+
+  "context": {
+    "warning_threshold": 60,
+    "handoff_threshold": 75,
+    "critical_threshold": 85,
+    "display_method": "emoji_bar",
+    "auto_handoff": false
+  },
+
+  "agents": {
+    "default_timeout": 300000,
+    "parallel_execution": true,
+    "session_history": true,
+    "history_location": "work/history"
+  },
+
+  "skills": {
+    "catch_up": {
+      "enabled": true,
+      "auto_trigger": true
+    },
+    "context_display": {
+      "enabled": true,
+      "show_on_every_response": true
+    },
+    "agent_session_summary": {
+      "enabled": true,
+      "auto_create": true
+    },
+    "setup_validation": {
+      "enabled": true,
+      "run_on_init": true
+    }
+  },
+
+  "commands": {
+    "handoff": {
+      "enabled": true,
+      "create_session_file": true,
+      "create_handoff_file": true
+    },
+    "commit": {
+      "enabled": true,
+      "add_signature": true,
+      "signature": "Generated with Claude Code"
+    },
+    "mr": {
+      "enabled": true,
+      "default_target": "main"
+    },
+    "onboard": {
+      "enabled": true
+    }
+  },
+
+  "work": {
+    "task_location": "work",
+    "stages": ["backlog", "active", "done"],
+    "history_location": "work/history",
+    "auto_create_task_files": true
+  },
+
+  "tdd": {
+    "required": true,
+    "min_coverage": 80,
+    "run_before_commit": true
+  },
+
+  "git": {
+    "auto_stage": false,
+    "require_tests": true,
+    "branch_prefix": ""
+  },
+
+  "display": {
+    "emoji_enabled": true,
+    "verbose_mode": false,
+    "show_agent_invocations": true
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Garden Settings",
+  "description": "Configuration schema for Garden 2.0",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Garden version"
+    },
+    "context": {
+      "type": "object",
+      "description": "Context management settings",
+      "properties": {
+        "warning_threshold": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 90,
+          "description": "Percentage for warning (default 60)"
+        },
+        "handoff_threshold": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 95,
+          "description": "Percentage for handoff (default 75)"
+        },
+        "critical_threshold": {
+          "type": "integer",
+          "minimum": 70,
+          "maximum": 100,
+          "description": "Percentage for critical (default 85)"
+        },
+        "display_method": {
+          "type": "string",
+          "enum": ["emoji_bar", "text", "minimal"],
+          "description": "How to display context usage"
+        },
+        "auto_handoff": {
+          "type": "boolean",
+          "description": "Automatically create handoff at threshold"
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "description": "Agent behavior settings",
+      "properties": {
+        "default_timeout": {
+          "type": "integer",
+          "description": "Default timeout in milliseconds"
+        },
+        "parallel_execution": {
+          "type": "boolean",
+          "description": "Allow parallel agent execution"
+        },
+        "session_history": {
+          "type": "boolean",
+          "description": "Create session history files"
+        },
+        "history_location": {
+          "type": "string",
+          "description": "Path for history files"
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "description": "Skill configuration",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "auto_trigger": { "type": "boolean" }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "description": "Command configuration",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" }
+        }
+      }
+    },
+    "work": {
+      "type": "object",
+      "description": "Work/task management settings",
+      "properties": {
+        "task_location": { "type": "string" },
+        "stages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "auto_create_task_files": { "type": "boolean" }
+      }
+    },
+    "tdd": {
+      "type": "object",
+      "description": "Test-driven development settings",
+      "properties": {
+        "required": { "type": "boolean" },
+        "min_coverage": { "type": "integer" },
+        "run_before_commit": { "type": "boolean" }
+      }
+    },
+    "git": {
+      "type": "object",
+      "description": "Git integration settings",
+      "properties": {
+        "auto_stage": { "type": "boolean" },
+        "require_tests": { "type": "boolean" },
+        "branch_prefix": { "type": "string" }
+      }
+    },
+    "display": {
+      "type": "object",
+      "description": "Display preferences",
+      "properties": {
+        "emoji_enabled": { "type": "boolean" },
+        "verbose_mode": { "type": "boolean" },
+        "show_agent_invocations": { "type": "boolean" }
+      }
+    }
+  }
+}

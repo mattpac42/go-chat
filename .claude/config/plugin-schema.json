@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Garden Plugin Configuration",
+  "description": "Schema for Garden 2.0 plugin configuration",
+  "type": "object",
+  "required": ["version", "name", "installed"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Garden version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Configuration name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Configuration description"
+    },
+    "installed": {
+      "type": "object",
+      "description": "Currently installed plugins",
+      "additionalProperties": {
+        "$ref": "#/definitions/installedPlugin"
+      }
+    },
+    "available": {
+      "type": "object",
+      "description": "Available plugins from registry",
+      "properties": {
+        "agents": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/availablePlugin" }
+        },
+        "workflows": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/availablePlugin" }
+        },
+        "skills": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/availablePlugin" }
+        },
+        "commands": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/availablePlugin" }
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "format": "uri"
+        },
+        "custom": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "auto_update_check": { "type": "boolean" },
+        "update_frequency": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "never"]
+        }
+      }
+    }
+  },
+  "definitions": {
+    "installedPlugin": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string" },
+        "installed_at": { "type": "string", "format": "date" },
+        "components": {
+          "type": "object",
+          "properties": {
+            "agents": { "type": "array", "items": { "type": "string" } },
+            "skills": { "type": "array", "items": { "type": "string" } },
+            "commands": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "availablePlugin": {
+      "type": "object",
+      "required": ["name", "source"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "source": {
+          "type": "string",
+          "enum": ["git", "local", "gnomes"]
+        },
+        "url": { "type": "string", "format": "uri" }
+      }
+    }
+  }
+}

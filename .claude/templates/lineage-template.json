@@ -1,0 +1,47 @@
+{
+  "garden": {
+    "source_path": "{garden_path}",
+    "commit_hash": "{commit_hash}",
+    "version": "2.0"
+  },
+  "project": {
+    "name": "{project_name}",
+    "type": "{project_type}",
+    "tech_stack": "{tech_stack}",
+    "description": "{project_description}",
+    "rooted_at": "{timestamp}"
+  },
+  "included": {
+    "agents": [],
+    "templates": [
+      "agent-template.md",
+      "prd.md",
+      "product-vision-template.md",
+      "task.md",
+      "tdd-task-template.md",
+      "handoff.md",
+      "session-summary-template.md"
+    ],
+    "skills": [
+      "catch-up",
+      "handoff",
+      "context-display",
+      "agent-session-summary",
+      "setup-validation"
+    ],
+    "commands": [
+      "commit.md",
+      "catch-up.md",
+      "handoff.md",
+      "mr.md",
+      "onboard.md",
+      "sync-baseline.md"
+    ],
+    "devcontainer": false
+  },
+  "sync": {
+    "enabled": true,
+    "last_sync": null,
+    "excluded_paths": []
+  }
+}

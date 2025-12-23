@@ -1,0 +1,6 @@
+# Ignore .vercel directory (created during vercel link)
+.vercel/
+
+# Ignore any local environment files
+.env.local
+.env.*.local

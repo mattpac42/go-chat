@@ -1,0 +1,131 @@
+{
+  // ========================================
+  // WORKSPACE ACCENT COLORS - "The Garden"
+  // ========================================
+  // Two-Color Theme System for Maximum Uniqueness
+  //
+  // PRIMARY ACCENT (Bright - for title bar, status bar, major elements)
+  // Green: #22c55e (emerald-500)
+  // Dark Green: #166534 (green-800)
+  //
+  // SECONDARY ACCENT (Complementary - for borders, icons, subtle accents)
+  // Dark Brown: #78350f (amber-900)
+  // Light Tan: #d97706 (amber-600)
+  //
+  // BACKGROUND TINT (Blend of both)
+  // Sidebar: #1f2617 (dark green-brown)
+  //
+  // ========================================
+  // EXAMPLE COLOR PAIRINGS:
+  // ========================================
+  // Nature:
+  //   Green + Brown: #22c55e, #78350f, #d97706
+  //   Teal + Sage: #14b8a6, #365314, #84cc16
+  //
+  // Ocean:
+  //   Blue + Teal: #3b82f6, #0f766e, #5eead4
+  //   Cyan + Navy: #06b6d4, #1e3a8a, #93c5fd
+  //
+  // Fire:
+  //   Red + Orange: #ef4444, #9a3412, #fdba74
+  //   Orange + Yellow: #f97316, #854d0e, #fde047
+  //
+  // Royal:
+  //   Purple + Blue: #a855f7, #1e40af, #93c5fd
+  //   Magenta + Purple: #ec4899, #6b21a8, #d8b4fe
+  //
+  // Sunset:
+  //   Pink + Orange: #ec4899, #9a3412, #fdba74
+  //   Rose + Gold: #f43f5e, #854d0e, #fde047
+  // ========================================
+
+  "workbench.colorCustomizations": {
+    // === ACCENT COLORS (Visible Identity Elements) ===
+
+    // Title Bar (Top - PRIMARY accent)
+    "titleBar.activeBackground": "#166534",
+    "titleBar.activeForeground": "#22c55e",
+    "titleBar.inactiveBackground": "#1e1e1e",
+    "titleBar.inactiveForeground": "#858585",
+    "titleBar.border": "#d97706",
+
+    // Status Bar (Bottom - PRIMARY accent)
+    "statusBar.background": "#166534",
+    "statusBar.foreground": "#22c55e",
+    "statusBar.border": "#d97706",
+    "statusBar.noFolderBackground": "#166534",
+    "statusBar.debuggingBackground": "#854d0e",
+    "statusBar.debuggingForeground": "#fde047",
+
+    // Activity Bar (Far Left - PRIMARY accent icons, SECONDARY border)
+    "activityBar.background": "#1e1e1e",
+    "activityBar.foreground": "#22c55e",
+    "activityBar.inactiveForeground": "#666666",
+    "activityBar.border": "#d97706",
+    "activityBarBadge.background": "#22c55e",
+    "activityBarBadge.foreground": "#000000",
+
+    // Active Tab Border (SECONDARY accent)
+    "tab.activeBorder": "#d97706",
+    "tab.activeBorderTop": "#d97706",
+
+    // Panel Title Border (SECONDARY accent)
+    "panelTitle.activeBorder": "#d97706",
+
+    // Sidebar Border (SECONDARY accent)
+    "sideBar.border": "#d97706",
+
+    // === DEFAULT DARK THEME (Functional Areas) ===
+    // Editor - Keep standard dark theme for readability
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+
+    // Sidebar - Green-brown blend background
+    "sideBar.background": "#1f2617",
+    "sideBar.foreground": "#cccccc",
+    "sideBarSectionHeader.background": "#78350f",
+    "sideBarSectionHeader.foreground": "#d97706",
+
+    // Tabs - Standard dark
+    "tab.activeBackground": "#1e1e1e",
+    "tab.activeForeground": "#ffffff",
+    "tab.inactiveBackground": "#2d2d2d",
+    "tab.inactiveForeground": "#969696",
+    "editorGroupHeader.tabsBackground": "#252526",
+
+    // Panel (Terminal/Output) - SECONDARY borders, PRIMARY text
+    "panel.background": "#1e1e1e",
+    "panel.border": "#d97706",
+    "panelTitle.activeForeground": "#22c55e",
+    "panelTitle.inactiveForeground": "#6b8a6b",
+    "panelSectionHeader.background": "#166534",
+    "panelSectionHeader.foreground": "#22c55e",
+
+    // Terminal - Standard dark
+    "terminal.background": "#1e1e1e",
+    "terminal.foreground": "#cccccc"
+  }
+}
+
+// ========================================
+// EXAMPLE: Red Theme Configuration
+// ========================================
+// Replace the three color values at the top:
+// Primary: #ef4444 (red-500)
+// Dark: #991b1b (red-800)
+// Light: #fca5a5 (red-300)
+//
+// "titleBar.activeBackground": "#991b1b",
+// "titleBar.activeForeground": "#fca5a5",
+// "titleBar.border": "#ef4444",
+// "statusBar.background": "#991b1b",
+// "statusBar.foreground": "#fca5a5",
+// "statusBar.border": "#ef4444",
+// "activityBar.foreground": "#ef4444",
+// "activityBar.border": "#ef4444",
+// "activityBarBadge.background": "#ef4444",
+// "tab.activeBorder": "#ef4444",
+// "tab.activeBorderTop": "#ef4444",
+// "panelTitle.activeBorder": "#ef4444",
+// "sideBar.border": "#ef4444"
+// ========================================

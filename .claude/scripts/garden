@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""
+Garden CLI - Command-line interface for Garden 2.0
+
+Usage:
+    garden list                 List installed plugins
+    garden agents               List available agents from gnomes/
+    garden status               Show Garden status
+    garden validate             Validate Garden setup
+    garden context              Show context usage
+    garden help                 Show this help
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+# Garden root detection
+def find_garden_root():
+    """Find .garden folder in current or parent directories"""
+    current = Path.cwd()
+    while current != current.parent:
+        garden_path = current / '.garden'
+        if garden_path.exists():
+            return garden_path
+        current = current.parent
+    return None
+
+GARDEN_ROOT = find_garden_root()
+
+def load_plugins_config():
+    """Load plugins.json configuration"""
+    if not GARDEN_ROOT:
+        return None
+    config_path = GARDEN_ROOT / 'config' / 'plugins.json'
+    if config_path.exists():
+        with open(config_path) as f:
+            return json.load(f)
+    return None
+
+def cmd_status():
+    """Show Garden status"""
+    if not GARDEN_ROOT:
+        print("❌ No .garden folder found")
+        return 1
+
+    print(f"🌱 Garden 2.0")
+    print(f"   Location: {GARDEN_ROOT}")
+    print()
+
+    # Check core files
+    core_files = ['PROTOCOLS.md', 'PROJECT.md', 'QUICKSTART.md']
+    print("📋 Core Files:")
+    for f in core_files:
+        path = GARDEN_ROOT / f
+        status = "✅" if path.exists() else "❌"
+        print(f"   {status} {f}")
+
+    # Check folders
+    folders = ['agents', 'skills', 'commands', 'work', 'config', 'plugins']
+    print("\n📁 Folders:")
+    for folder in folders:
+        path = GARDEN_ROOT / folder
+        if path.exists():
+            count = len(list(path.glob('*.md'))) + len(list(path.glob('*.json')))
+            print(f"   ✅ {folder}/ ({count} files)")
+        else:
+            print(f"   ❌ {folder}/")
+
+    return 0
+
+def cmd_validate():
+    """Validate Garden setup"""
+    if not GARDEN_ROOT:
+        print("❌ No .garden folder found")
+        return 1
+
+    issues = []
+
+    # Check required files
+    required = ['PROTOCOLS.md', 'PROJECT.md']
+    for f in required:
+        if not (GARDEN_ROOT / f).exists():
+            issues.append(f"Missing required file: {f}")
+
+    # Check agents
+    required_agents = ['developer', 'architect', 'product', 'platform', 'researcher']
+    agents_dir = GARDEN_ROOT / 'agents'
+    for agent in required_agents:
+        if not (agents_dir / f"{agent}.md").exists():
+            issues.append(f"Missing agent: {agent}")
+
+    # Check skills
+    required_skills = ['catch-up', 'agent-session-summary', 'context-display', 'setup-validation']
+    skills_dir = GARDEN_ROOT / 'skills'
+    for skill in required_skills:
+        if not (skills_dir / f"{skill}.md").exists():
+            issues.append(f"Missing skill: {skill}")
+
+    # Check plugins.json
+    plugins_path = GARDEN_ROOT / 'config' / 'plugins.json'
+    if plugins_path.exists():
+        try:
+            with open(plugins_path) as f:
+                json.load(f)
+        except json.JSONDecodeError:
+            issues.append("Invalid JSON in plugins.json")
+    else:
+        issues.append("Missing plugins.json")
+
+    if issues:
+        print("❌ Validation failed:")
+        for issue in issues:
+            print(f"   • {issue}")
+        return 1
+    else:
+        print("✅ Garden validation passed")
+        return 0
+
+def cmd_list():
+    """List installed plugins"""
+    config = load_plugins_config()
+    if not config:
+        print("❌ No plugins configuration found")
+        return 1
+
+    installed = config.get('installed', {})
+    if not installed:
+        print("No plugins installed")
+        return 0
+
+    print("📦 Installed Plugins:")
+    for name, info in installed.items():
+        version = info.get('version', 'unknown')
+        desc = info.get('description', '')
+        print(f"   • {name} v{version}")
+        if desc:
+            print(f"     {desc}")
+        components = info.get('components', {})
+        if components:
+            for comp_type, items in components.items():
+                if items:
+                    print(f"     {comp_type}: {', '.join(items)}")
+
+    return 0
+
+def cmd_agents():
+    """List available agents from gnomes/"""
+    if not GARDEN_ROOT:
+        print("❌ No .garden folder found")
+        return 1
+
+    # Look for gnomes/agents relative to project root
+    project_root = GARDEN_ROOT.parent
+    gnomes_agents = project_root / 'gnomes' / 'agents'
+
+    if not gnomes_agents.exists():
+        print("❌ gnomes/agents/ folder not found")
+        return 1
+
+    agents = list(gnomes_agents.glob('*.md'))
+    agents = [a for a in agents if a.name not in ['README.md', 'RECRUITMENT-CREW-README.md']]
+
+    print(f"🤖 Available Agents ({len(agents)} total):")
+    print(f"   Location: {gnomes_agents}")
+    print()
+
+    # Group by prefix
+    groups = {}
+    for agent in sorted(agents):
+        name = agent.stem
+        prefix = name.split('-')[0] if '-' in name else 'other'
+        if prefix not in groups:
+            groups[prefix] = []
+        groups[prefix].append(name)
+
+    for group, names in sorted(groups.items()):
+        print(f"   {group}: {len(names)} agents")
+
+    return 0
+
+def cmd_context():
+    """Show context usage"""
+    # Try to run context-tracker.py
+    tracker_path = GARDEN_ROOT / 'scripts' / 'context-tracker.py' if GARDEN_ROOT else None
+    if tracker_path and tracker_path.exists():
+        os.system(f'python3 {tracker_path}')
+    else:
+        print("Context tracking requires context-tracker.py")
+        print("Run /context in Claude Code for accurate usage")
+    return 0
+
+def cmd_help():
+    """Show help"""
+    print(__doc__)
+    return 0
+
+def main():
+    parser = argparse.ArgumentParser(description='Garden CLI')
+    parser.add_argument('command', nargs='?', default='help',
+                       choices=['list', 'agents', 'status', 'validate', 'context', 'help'])
+    parser.add_argument('args', nargs='*')
+
+    args = parser.parse_args()
+
+    commands = {
+        'status': cmd_status,
+        'validate': cmd_validate,
+        'list': cmd_list,
+        'agents': cmd_agents,
+        'context': cmd_context,
+        'help': cmd_help,
+    }
+
+    if args.command in commands:
+        return commands[args.command]()
+
+    return cmd_help()
+
+if __name__ == '__main__':
+    sys.exit(main())

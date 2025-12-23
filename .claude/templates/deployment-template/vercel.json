@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd {{APP_DIRECTORY}} && npm install && npm run build",
+  "outputDirectory": "{{APP_DIRECTORY}}/build",
+  "framework": "vite",
+  "installCommand": "cd {{APP_DIRECTORY}} && npm install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# ===============================================================================
+# Custom Docker-in-Docker Image with CA Certificate Support
+# ===============================================================================
+# This image is used by GitLab CI/CD pipelines to ensure the Docker daemon
+# trusts custom CA certificates for container registries.
+#
+# The base docker:27-dind image runs a Docker daemon that makes HTTPS connections
+# to the registry. By pre-installing the Root CA, we ensure secure, validated
+# TLS connections without workarounds.
+# ===============================================================================
+
+FROM docker:27-dind
+
+# Install certificate handling tools
+RUN apk add --no-cache ca-certificates
+
+# Copy the Root CA certificate
+# This will be populated from the LOCAL_CA_CERT environment variable during build
+ARG LOCAL_CA_CERT
+RUN if [ -n "$LOCAL_CA_CERT" ]; then \
+        echo "$LOCAL_CA_CERT" | base64 -d > /tmp/custom-root-ca.crt && \
+        # Install for system CA trust \
+        cp /tmp/custom-root-ca.crt /usr/local/share/ca-certificates/custom-root-ca.crt && \
+        update-ca-certificates && \
+        # Install for Docker registry trust \
+        mkdir -p /etc/docker/certs.d/{{CI_REGISTRY}} && \
+        cp /tmp/custom-root-ca.crt /etc/docker/certs.d/{{CI_REGISTRY}}/ca.crt && \
+        rm /tmp/custom-root-ca.crt && \
+        echo "✅ Root CA installed in DinD image"; \
+    else \
+        echo "❌ ERROR: LOCAL_CA_CERT not provided" && exit 1; \
+    fi
+
+# Configure Docker daemon to allow insecure registry as fallback during bootstrap
+# This allows the initial build to work even before the CA trust is established
+RUN mkdir -p /etc/docker && \
+    echo '{"insecure-registries": ["{{CI_REGISTRY}}"]}' > /etc/docker/daemon.json
+
+# Use the default docker-entrypoint from parent image
+# The daemon will now trust custom certificates AND accept insecure registry

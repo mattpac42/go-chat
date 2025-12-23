@@ -1,0 +1,61 @@
+Deployment Template Structure
+==============================
+
+deployment-template/
+├── README.md                           # Setup instructions and placeholder reference
+├── DEPLOY.md                           # Full deployment guide (templated)
+├── STRUCTURE.txt                       # This file - visual directory structure
+├── vercel.json                         # Root-level Vercel configuration
+├── .github/
+│   └── workflows/
+│       ├── firebase-deploy.yml         # Firebase CI/CD workflow
+│       └── vercel-deploy.yml           # Vercel CI/CD workflow
+└── app-config/                         # Files to copy to your app directory
+    ├── firebase.json                   # Firebase hosting configuration
+    └── .firebaserc                     # Firebase project reference
+
+Usage:
+------
+
+1. Copy this entire folder to your project
+2. Follow instructions in README.md to:
+   - Replace all {{PLACEHOLDER}} values
+   - Move files to correct locations
+   - Configure GitHub secrets
+   - Deploy to Firebase and Vercel
+
+3. Files to copy to project root:
+   - vercel.json                        → /
+   - DEPLOY.md                          → /
+   - .github/workflows/*.yml            → /.github/workflows/
+
+4. Files to copy to your app directory:
+   - app-config/firebase.json           → /{{APP_DIRECTORY}}/
+   - app-config/.firebaserc             → /{{APP_DIRECTORY}}/
+
+Placeholders Used:
+------------------
+
+{{PROJECT_NAME}}              - Display name
+{{PROJECT_DESCRIPTION}}       - Brief description
+{{APP_DIRECTORY}}             - Application subdirectory
+{{FIREBASE_PROJECT_ID}}       - Firebase project ID
+{{VERCEL_PROJECT_ID}}         - Vercel project ID
+{{VERCEL_ORG_ID}}             - Vercel organization ID
+{{GITHUB_REPO_URL}}           - GitHub repository URL
+{{GITHUB_USERNAME}}           - GitHub username
+{{GITHUB_REPO_NAME}}          - GitHub repository name
+{{CUSTOM_DOMAIN}}             - Custom domain (optional)
+{{VERCEL_URL}}                - Vercel deployment URL
+{{FIREBASE_URL}}              - Firebase Hosting URL
+
+Required GitHub Secrets:
+-----------------------
+
+- FIREBASE_SERVICE_ACCOUNT    (JSON service account key)
+- FIREBASE_PROJECT_ID         (Firebase project ID)
+- VERCEL_TOKEN                (Vercel authentication token)
+- VERCEL_ORG_ID               (Vercel organization ID)
+- VERCEL_PROJECT_ID           (Vercel project ID)
+
+See README.md for detailed setup instructions.

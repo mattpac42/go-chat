@@ -1,0 +1,60 @@
+{
+  "name": "Go Chat - Next.js",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:18-bookworm",
+
+  "runArgs": [
+    "--security-opt", "label=disable"
+  ],
+
+  "containerEnv": {
+    "NODE_ENV": "development"
+  },
+
+  "postCreateCommand": ".devcontainer/setup.sh",
+
+  "postStartCommand": "echo 'Go Chat Dev Environment Ready!' && echo 'Run: claude auth login' && echo 'Start: npm run dev'",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-typescript-next",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "files.exclude": {
+          "**/node_modules": true,
+          "**/.next": true,
+          "**/dist": true
+        }
+      }
+    }
+  },
+
+  "forwardPorts": [3000],
+
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "remoteUser": "node",
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+}

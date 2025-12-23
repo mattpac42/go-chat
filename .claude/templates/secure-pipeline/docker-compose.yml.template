@@ -1,0 +1,38 @@
+# ===============================================================================
+# Docker Compose Deployment Configuration Template
+# ===============================================================================
+# This template provides:
+# - Dynamic image configuration via environment variables
+# - Health checks
+# - Restart policies
+# - Volume persistence
+# - Network isolation
+# ===============================================================================
+
+version: '3.8'
+
+services:
+  {{APP_NAME}}-app:
+    image: ${DOCKER_IMAGE:-{{CI_REGISTRY_IMAGE}}:latest}
+    container_name: {{APP_NAME}}-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:{{DEPLOY_PORT}}:{{DEPLOY_PORT}}"
+    volumes:
+      - {{DATA_PATH}}:/app/instance
+    environment:
+      - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-unknown}
+      - GIT_BRANCH=${GIT_BRANCH:-unknown}
+      - GIT_COMMIT_TIME=${GIT_COMMIT_TIME:-unknown}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:{{DEPLOY_PORT}}/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - {{APP_NAME}}-network
+
+networks:
+  {{APP_NAME}}-network:
+    driver: bridge

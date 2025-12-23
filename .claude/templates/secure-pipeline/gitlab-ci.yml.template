@@ -1,0 +1,381 @@
+# ===============================================================================
+# Secure GitLab CI/CD Release Pipeline Template
+# ===============================================================================
+# This template provides a production-ready Docker-based deployment pipeline with:
+# - Multi-stage builds for optimized container images
+# - Security scanning with Trivy
+# - Custom Docker-in-Docker (DinD) with CA certificate support
+# - Release gates and vulnerability checks
+# - Automated deployment via SSH + Docker Compose
+# - Build metadata tracking
+# ===============================================================================
+
+# ===============================================================================
+# CONFIGURATION VARIABLES
+# ===============================================================================
+#
+# REQUIRED: Customize these variables for your application
+#
+variables:
+  # Application Configuration
+  APP_NAME: "{{APP_NAME}}"                    # Application name (lowercase, no spaces)
+  APP_DOMAIN: "{{APP_DOMAIN}}"                # Application domain (e.g., app.example.com)
+  DEPLOY_PORT: "{{DEPLOY_PORT}}"              # Application port (e.g., 4000)
+
+  # Registry Configuration
+  CI_REGISTRY: "{{CI_REGISTRY}}"              # GitLab registry URL (e.g., gitlab.example.com:5050)
+  CI_REGISTRY_IMAGE: "{{CI_REGISTRY_IMAGE}}"  # Full registry path (e.g., gitlab.example.com:5050/group/project)
+
+  # Version Management
+  VERSION_FILE: "{{VERSION_FILE}}"            # File containing version number (e.g., VERSION)
+
+  # Docker Configuration
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""                      # Disabled - registry TLS is the critical security layer
+
+  # Quick Deploy Toggle (set to "true" to skip lint, test, scan stages for fast testing)
+  QUICK_DEPLOY: "false"
+
+# ===============================================================================
+# PIPELINE STAGES
+# ===============================================================================
+stages:
+  - prepare      # Build custom DinD image with CA certificates
+  - lint         # Code quality checks
+  - test         # Run tests
+  - build        # Build container image
+  - scan         # Security vulnerability scanning
+  - release      # Validate release readiness
+  - deploy       # Deploy to production
+
+# ===============================================================================
+# CONDITIONAL EXECUTION RULES
+# ===============================================================================
+# Skip heavy stages when QUICK_DEPLOY is enabled
+.skip_if_quick: &skip_if_quick
+  rules:
+    - if: $QUICK_DEPLOY == "true"
+      when: never
+    - when: on_success
+
+# ===============================================================================
+# CA CERTIFICATE INSTALLATION
+# ===============================================================================
+# Install Home Lab Root CA for GitLab registry access
+# Required if using self-signed certificates or internal CA
+.install-gitlab-cert: &install-gitlab-cert
+  - echo "Installing Home Lab Root CA for GitLab at $CI_REGISTRY"
+  - |
+    # Install CA certificates package
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update && apt-get install -y ca-certificates curl
+    elif command -v apk >/dev/null 2>&1; then
+      apk add --no-cache ca-certificates curl
+    fi
+  - |
+    # Install Home Lab Root CA if provided
+    if [ -n "${LOCAL_CA_CERT:-}" ]; then
+      echo "Installing Root CA from LOCAL_CA_CERT variable..."
+      echo "$LOCAL_CA_CERT" | base64 -d > /tmp/home-lab-ca.crt
+
+      if command -v update-ca-certificates >/dev/null 2>&1; then
+        mkdir -p /usr/local/share/ca-certificates/
+        cp /tmp/home-lab-ca.crt /usr/local/share/ca-certificates/custom-root-ca.crt
+        update-ca-certificates
+      fi
+
+      # Docker registry trust
+      mkdir -p /etc/docker/certs.d/${CI_REGISTRY}
+      cp /tmp/home-lab-ca.crt /etc/docker/certs.d/${CI_REGISTRY}/ca.crt
+
+      echo "✅ Root CA installed"
+    else
+      echo "⚠️ LOCAL_CA_CERT not set, skipping CA installation"
+    fi
+
+# ===============================================================================
+# PREPARE STAGE - Build Custom DinD Image
+# ===============================================================================
+build_dind_image:
+  tags: ["docker"]
+  stage: prepare
+  image: docker:27
+  services:
+    - name: $CI_REGISTRY_IMAGE/docker-dind:27-with-cert
+      alias: docker
+      variables:
+        DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "Using custom DinD image with Root CA trust"
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - echo "Building custom dind image with Root CA"
+    - |
+      # Check if image already exists, skip build if Dockerfile unchanged
+      if docker pull $CI_REGISTRY_IMAGE/docker-dind:27-with-cert 2>/dev/null; then
+        echo "Custom dind image already exists, checking if rebuild needed..."
+        if [ -z "$(git diff HEAD~1 -- Dockerfile.dind 2>/dev/null)" ]; then
+          echo "✅ No changes to Dockerfile.dind, using existing image"
+          exit 0
+        fi
+      fi
+    - echo "Building new custom dind image..."
+    - |
+      docker build \
+        --build-arg LOCAL_CA_CERT="$LOCAL_CA_CERT" \
+        -f Dockerfile.dind \
+        -t $CI_REGISTRY_IMAGE/docker-dind:27-with-cert \
+        -t $CI_REGISTRY_IMAGE/docker-dind:latest \
+        .
+    - docker push $CI_REGISTRY_IMAGE/docker-dind:27-with-cert
+    - docker push $CI_REGISTRY_IMAGE/docker-dind:latest
+    - echo "✅ Custom dind image built and pushed"
+  rules:
+    # Only run when Dockerfile.dind or LOCAL_CA_CERT changes, or manually triggered
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - Dockerfile.dind
+        - .gitlab-ci.yml
+      when: on_success
+    # Allow manual trigger for certificate rotation or troubleshooting
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
+
+# ===============================================================================
+# DOCKER EXECUTOR CONFIGURATION
+# ===============================================================================
+.docker-executor:
+  tags: ["docker"]
+  image: docker:27
+  services:
+    - name: $CI_REGISTRY_IMAGE/docker-dind:27-with-cert
+      alias: docker
+  before_script:
+    # Wait for Docker daemon to be ready
+    - |
+      echo "Waiting for Docker daemon..."
+      for i in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+          echo "✓ Docker daemon ready"
+          break
+        fi
+        if [ $i -eq 30 ]; then
+          echo "✗ Docker daemon failed to start"
+          exit 1
+        fi
+        sleep 1
+      done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+
+# ===============================================================================
+# LINT STAGE
+# ===============================================================================
+lint:
+  <<: *skip_if_quick
+  tags: ["docker"]
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - pip install ruff
+    - echo "🔍 Running code quality checks with Ruff"
+    - ruff check . --fix --output-format=full
+    - ruff check . --output-format=full
+    - echo "✅ Code quality checks passed"
+
+# ===============================================================================
+# TEST STAGE
+# ===============================================================================
+test:
+  <<: *skip_if_quick
+  tags: ["docker"]
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install pytest
+    - pip install -r requirements.txt
+    - echo "🧪 Running Python tests..."
+    - |
+      if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+        python -m pytest -v
+      else
+        echo "No test files found, skipping tests"
+      fi
+
+# ===============================================================================
+# BUILD STAGE
+# ===============================================================================
+build_image:
+  extends: .docker-executor
+  stage: build
+  script:
+    # Read version from VERSION file
+    - VERSION=$(cat $VERSION_FILE)
+    - SHORT_SHA="${CI_COMMIT_SHORT_SHA}"
+    - FULL_SHA="${CI_COMMIT_SHA}"
+    - VERSION_TAG="${VERSION}-${SHORT_SHA}"
+
+    - echo "Building version $VERSION_TAG"
+
+    # Create build metadata file
+    - |
+      cat > .buildinfo << EOF
+      {
+        "version": "$VERSION",
+        "version_tag": "$VERSION_TAG",
+        "git_commit": "$SHORT_SHA",
+        "git_commit_full": "$FULL_SHA",
+        "git_branch": "$CI_COMMIT_REF_NAME",
+        "git_commit_time": "$CI_COMMIT_TIMESTAMP",
+        "build_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+        "build_job": "$CI_JOB_ID",
+        "pipeline": "$CI_PIPELINE_ID"
+      }
+      EOF
+
+    # Build image once with temporary tag
+    - docker build -t temp-build:${CI_PIPELINE_ID} .
+
+    # Apply multiple tags for different use cases
+    - docker tag temp-build:${CI_PIPELINE_ID} $CI_REGISTRY_IMAGE:${VERSION_TAG}
+    - docker tag temp-build:${CI_PIPELINE_ID} $CI_REGISTRY_IMAGE:sha-${FULL_SHA}
+    - docker tag temp-build:${CI_PIPELINE_ID} $CI_REGISTRY_IMAGE:${VERSION}
+    - docker tag temp-build:${CI_PIPELINE_ID} $CI_REGISTRY_IMAGE:latest
+
+    # Push all tags
+    - echo "Pushing tags--${VERSION_TAG}, sha-${FULL_SHA}, ${VERSION}, latest"
+    - docker push $CI_REGISTRY_IMAGE:${VERSION_TAG}
+    - docker push $CI_REGISTRY_IMAGE:sha-${FULL_SHA}
+    - docker push $CI_REGISTRY_IMAGE:${VERSION}
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+    # Export primary version tag for downstream jobs
+    - IMAGE_DIGEST=$(docker inspect $CI_REGISTRY_IMAGE:${VERSION_TAG} --format='{{.Id}}')
+    - echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> build.env
+    - echo "DOCKER_IMAGE=$CI_REGISTRY_IMAGE:${VERSION_TAG}" >> build.env
+    - echo "VERSION=$VERSION" >> build.env
+    - echo "VERSION_TAG=$VERSION_TAG" >> build.env
+
+    # Cleanup temporary tag
+    - docker rmi temp-build:${CI_PIPELINE_ID}
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths: ["build.env", ".buildinfo"]
+    expire_in: 1 hour
+
+# ===============================================================================
+# SCAN STAGE - Security Scanning with Trivy
+# ===============================================================================
+scan_image:
+  <<: *skip_if_quick
+  tags: ["docker"]
+  stage: scan
+  image: docker:27
+  services:
+    - name: $CI_REGISTRY_IMAGE/docker-dind:27-with-cert
+      alias: docker
+  needs: ["build_image"]
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+  script:
+    - echo "Pulling image for vulnerability scan $DOCKER_IMAGE"
+    - docker pull $DOCKER_IMAGE
+    - echo "Scanning image for vulnerabilities $DOCKER_IMAGE"
+    - trivy image --severity HIGH,CRITICAL --format json -o trivy.json $DOCKER_IMAGE
+    - echo "Generating human-readable report"
+    - trivy image --severity HIGH,CRITICAL $DOCKER_IMAGE
+  artifacts:
+    paths: ["trivy.json"]
+    expire_in: 30 days
+  allow_failure: true
+
+# ===============================================================================
+# RELEASE GATE - Validate before deployment
+# ===============================================================================
+release_gate:
+  tags: ["docker"]
+  stage: release
+  image: alpine:latest
+  needs:
+    - job: "build_image"
+    - job: "scan_image"
+      optional: true
+  before_script:
+    - apk add --no-cache jq
+  script:
+    - |
+      if [ "${QUICK_DEPLOY:-false}" = "true" ]; then
+        echo "🚀 QUICK DEPLOY MODE: Skipping security checks"
+        echo "✅ Quick release approved"
+        exit 0
+      fi
+
+    - echo "Checking vulnerability scan results..."
+    - |
+      if [ -f "trivy.json" ]; then
+        HIGH_CRIT_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH")] | length' trivy.json)
+        echo "Found $HIGH_CRIT_COUNT HIGH/CRITICAL vulnerabilities"
+
+        if [ "$HIGH_CRIT_COUNT" -gt 0 ]; then
+          echo "⚠️ HIGH/CRITICAL vulnerabilities found"
+          jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH") | "• \(.VulnerabilityID): \(.Severity) - \(.Title // .Description)"' trivy.json | head -20
+          echo "Note: Continuing deployment (allow_failure: true)"
+        else
+          echo "✅ No critical/high vulnerabilities found"
+        fi
+      else
+        echo "⚠️ No scan results found, skipping vulnerability check"
+      fi
+
+    - mkdir -p release
+    - echo "$DOCKER_IMAGE" > release/image.txt
+    - echo "$IMAGE_DIGEST" >> release/image.txt
+    - echo "✅ Release gate passed"
+  artifacts:
+    paths: ["release/"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG'
+      when: on_success
+    - when: manual
+
+# ===============================================================================
+# DEPLOY STAGE - SSH + Docker Compose Deployment
+# ===============================================================================
+deploy_to_platform:
+  tags: ["docker"]
+  stage: deploy
+  image: alpine:latest
+  needs:
+    - job: "build_image"
+      artifacts: true
+    - job: "release_gate"
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - cp "$DEPLOY_SSH_KEY" ~/.ssh/deploy_key
+    - chmod 600 ~/.ssh/deploy_key
+    - echo "Host *" > ~/.ssh/config
+    - echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+    - echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+    - chmod 600 ~/.ssh/config
+  script:
+    - echo "Deploying to {{DEPLOY_HOST}} as {{DEPLOY_USER}}"
+    - echo "Image $DOCKER_IMAGE"
+    - scp -i ~/.ssh/deploy_key -o IdentitiesOnly=yes docker-compose.yml {{DEPLOY_USER}}@{{DEPLOY_HOST}}:{{DEPLOY_PATH}}/
+    - ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes {{DEPLOY_USER}}@{{DEPLOY_HOST}} "cd {{DEPLOY_PATH}} && export DOCKER_IMAGE='${DOCKER_IMAGE}' && export GIT_COMMIT_SHA='${CI_COMMIT_SHORT_SHA}' && export GIT_BRANCH='${CI_COMMIT_REF_NAME}' && export GIT_COMMIT_TIME='${CI_COMMIT_TIMESTAMP}' && echo '${CI_JOB_TOKEN}' | docker login -u gitlab-ci-token --password-stdin '${CI_REGISTRY}' && docker-compose pull && docker-compose up -d && sleep 5 && docker-compose ps"
+    - echo "Running health check"
+    - sleep 3
+    - ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes {{DEPLOY_USER}}@{{DEPLOY_HOST}} "curl -f http://localhost:${DEPLOY_PORT}/ || exit 1"
+    - echo "Application is healthy"
+    - echo "Public URL https://${APP_DOMAIN}"
+  environment:
+    name: production
+    url: https://$APP_DOMAIN
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: manual
