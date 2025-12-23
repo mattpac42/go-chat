@@ -1,0 +1,87 @@
+{
+  // ========================================
+  // WORKSPACE ACCENT COLORS - "Go Chat"
+  // Theme: White + Aquamarine
+  // ========================================
+  // Two-Color Theme System for Maximum Uniqueness
+  //
+  // PRIMARY ACCENT (White - for title bar, status bar, major elements)
+  // White: #f3f4f6 (gray-100)
+  // Light Gray: #d1d5db (gray-300)
+  //
+  // SECONDARY ACCENT (Aquamarine - for borders, icons, subtle accents)
+  // Aquamarine: #5eead4 (teal-300)
+  // Dark Teal: #0f766e (teal-700)
+  //
+  // BACKGROUND TINT (Blend of both)
+  // Sidebar: #1a2e2e (dark aqua-tinted)
+  //
+  // ========================================
+
+  "workbench.colorCustomizations": {
+    // === ACCENT COLORS (Visible Identity Elements) ===
+
+    // Title Bar (Top - PRIMARY accent)
+    "titleBar.activeBackground": "#0f766e",
+    "titleBar.activeForeground": "#f3f4f6",
+    "titleBar.inactiveBackground": "#1e1e1e",
+    "titleBar.inactiveForeground": "#858585",
+    "titleBar.border": "#5eead4",
+
+    // Status Bar (Bottom - PRIMARY accent)
+    "statusBar.background": "#0f766e",
+    "statusBar.foreground": "#f3f4f6",
+    "statusBar.border": "#5eead4",
+    "statusBar.noFolderBackground": "#0f766e",
+    "statusBar.debuggingBackground": "#0e7490",
+    "statusBar.debuggingForeground": "#5eead4",
+
+    // Activity Bar (Far Left - PRIMARY accent icons, SECONDARY border)
+    "activityBar.background": "#1e1e1e",
+    "activityBar.foreground": "#5eead4",
+    "activityBar.inactiveForeground": "#666666",
+    "activityBar.border": "#5eead4",
+    "activityBarBadge.background": "#5eead4",
+    "activityBarBadge.foreground": "#000000",
+
+    // Active Tab Border (SECONDARY accent)
+    "tab.activeBorder": "#5eead4",
+    "tab.activeBorderTop": "#5eead4",
+
+    // Panel Title Border (SECONDARY accent)
+    "panelTitle.activeBorder": "#5eead4",
+
+    // Sidebar Border (SECONDARY accent)
+    "sideBar.border": "#5eead4",
+
+    // === DEFAULT DARK THEME (Functional Areas) ===
+    // Editor - Keep standard dark theme for readability
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+
+    // Sidebar - Aqua-tinted background
+    "sideBar.background": "#1a2e2e",
+    "sideBar.foreground": "#cccccc",
+    "sideBarSectionHeader.background": "#0f766e",
+    "sideBarSectionHeader.foreground": "#5eead4",
+
+    // Tabs - Standard dark
+    "tab.activeBackground": "#1e1e1e",
+    "tab.activeForeground": "#ffffff",
+    "tab.inactiveBackground": "#2d2d2d",
+    "tab.inactiveForeground": "#969696",
+    "editorGroupHeader.tabsBackground": "#252526",
+
+    // Panel (Terminal/Output) - SECONDARY borders, PRIMARY text
+    "panel.background": "#1e1e1e",
+    "panel.border": "#5eead4",
+    "panelTitle.activeForeground": "#f3f4f6",
+    "panelTitle.inactiveForeground": "#6b9b9b",
+    "panelSectionHeader.background": "#0f766e",
+    "panelSectionHeader.foreground": "#f3f4f6",
+
+    // Terminal - Standard dark
+    "terminal.background": "#1e1e1e",
+    "terminal.foreground": "#cccccc"
+  }
+}
