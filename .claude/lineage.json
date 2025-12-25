@@ -16,7 +16,13 @@
       "developer",
       "architect",
       "ux-tactical",
+      "ux-strategic",
       "platform-tactical",
+      "platform-strategic",
+      "software-tactical",
+      "software-strategic",
+      "product-manager-tactical",
+      "product-manager-strategic",
       "researcher"
     ],
     "templates": [
@@ -48,8 +54,6 @@
   "sync": {
     "enabled": true,
     "last_sync": null,
-    "excluded_paths": [
-      ".devcontainer"
-    ]
+    "excluded_paths": []
   }
 }

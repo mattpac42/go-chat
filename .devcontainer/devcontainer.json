@@ -7,12 +7,14 @@
   ],
 
   "containerEnv": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "PULSE_SERVER": "host.containers.internal"
   },
 
   "postCreateCommand": ".devcontainer/setup.sh",
 
-  "postStartCommand": "echo 'Go Chat Dev Environment Ready!' && echo 'Run: claude auth login' && echo 'Start: npm run dev'",
+  "postStartCommand": "echo 'Go Chat Dev Environment Ready!'",
+  "postAttachCommand": "claude --dangerously-skip-permissions",
 
   "customizations": {
     "vscode": {
