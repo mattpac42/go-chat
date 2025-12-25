@@ -25,6 +25,17 @@ fi
 git config --global init.defaultBranch main
 git config --global pull.rebase false
 
+# GitLab SSL certificate setup (for self-hosted gitlab.yuki.lan)
+# Option A: If you have the CA cert file, copy it to .devcontainer/gitlab-ca.crt and uncomment:
+# if [ -f ".devcontainer/gitlab-ca.crt" ]; then
+#     sudo cp .devcontainer/gitlab-ca.crt /usr/local/share/ca-certificates/gitlab-yuki-lan.crt
+#     sudo update-ca-certificates
+#     echo "GitLab CA certificate installed"
+# fi
+
+# Option B: Disable SSL verification for GitLab only (less secure, but works)
+git config --global http.https://gitlab.yuki.lan/.sslVerify false
+
 echo ""
 echo "Setup complete!"
 echo "Run: claude auth login"
