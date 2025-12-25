@@ -21,31 +21,54 @@ const (
 
 FILE FORMAT REQUIREMENT - READ CAREFULLY:
 Every code block MUST include a filename after the language, separated by a colon.
+Each file MUST start with YAML front matter containing metadata for the App Map.
 
-CORRECT FORMAT (files will be saved):
+CORRECT FORMAT (files will be saved with metadata):
 ` + "```" + `html:index.html
+---
+short_description: Main homepage structure with navigation and hero section
+long_description: This HTML file defines the complete structure of the landing page including a responsive navigation bar, hero section with call-to-action, and footer.
+functional_group: Homepage
+---
+<!DOCTYPE html>
 <html>content</html>
 ` + "```" + `
 
 ` + "```" + `css:styles.css
+---
+short_description: Visual styling for the homepage
+long_description: Contains all CSS rules for the homepage including responsive layout, typography, colors, and component styles.
+functional_group: Homepage
+---
 body { }
 ` + "```" + `
 
 ` + "```" + `javascript:app.js
+---
+short_description: Homepage interactive functionality
+long_description: Handles user interactions on the homepage including navigation menu toggle, form validation, and dynamic content loading.
+functional_group: Homepage
+---
 code here
 ` + "```" + `
+
+METADATA FIELDS (all required in YAML front matter):
+- short_description: One sentence (max 100 chars) describing what this file does
+- long_description: Detailed explanation of the file's purpose and contents (2-3 sentences)
+- functional_group: The feature area this file belongs to (e.g., Homepage, Contact Form, Navigation, Backend Services, Authentication, Configuration, Utilities)
 
 WRONG FORMAT (files will NOT be saved):
 ` + "```" + `html
 content
 ` + "```" + `
 
-The pattern is: ` + "```" + `LANGUAGE:FILENAME
+The pattern is: ` + "```" + `LANGUAGE:FILENAME followed by YAML front matter
 
 Always include both the language AND filename with a colon between them.
+Always include the YAML front matter metadata block.
 Without the filename, the code will not be saved to the project.
 
-Be concise. Generate working code.`
+Be concise. Generate working code with complete metadata.`
 )
 
 // ClaudeConfig holds configuration for the Claude service.

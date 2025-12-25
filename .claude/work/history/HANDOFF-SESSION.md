@@ -1,75 +1,95 @@
 # Handoff: Go Chat Session
 
-**Previous Session**: SESSION-001
-**Date**: 2025-12-24
+**Previous Session**: SESSION-002
+**Date**: 2025-12-25
+**Branch**: `feature/app-map-discovery`
 
 ## Immediate Context
 
-We were debugging the **file tree feature** - getting AI-generated code to save as files and display in the sidebar.
+We completed the MVP and product vision v2.0, then started designing the **multi-agent chat experience** - where specialized agents (Product Guide, UX Expert, Architect, Developer) collaborate in the chat like a Slack channel with experts.
 
 ### Last Task In Progress
 
-Testing filename inference fallback. Just added code that:
-1. Extracts filenames from user message (e.g., "Create index.html")
-2. Matches them to code blocks by language
-3. Saves files even when Claude doesn't use `language:filename` format
+**Adding Multi-Agent Team Experience to PRODUCT_VISION.md**
 
-### What Needs Testing
+The design team completed a full strategy for multi-agent chat UX. User requested this be added as a new Strategic Theme in the product vision before we were interrupted.
 
-```bash
-# 1. Restart backend (picks up new code)
-cd backend && go run ./cmd/server
+### What Needs to Happen Next
 
-# 2. In browser, create NEW project, send:
-"Create index.html with hello world"
+1. **Add Theme 6: Multi-Agent Team Experience** to PRODUCT_VISION.md
+   - Coordinated team model with Product Guide as lead
+   - Visual treatment (colors, icons per agent)
+   - One-voice-at-a-time rule
+   - Progressive agent introduction
 
-# 3. Check backend logs for:
-"extracted code block" ... "filename":"index.html"
-"saved extracted file" ... "filename":"index.html"
-```
+2. **Then continue with implementation:**
+   - Guided discovery flow
+   - App Map / functional file groupings
+   - 2-tier file reveal system
 
 ## Critical Files
 
 | File | Why |
 |------|-----|
-| `backend/internal/service/chat.go` | Filename inference logic, file saving |
-| `backend/internal/service/claude.go` | System prompt with file format instructions |
-| `frontend/src/components/projects/FileTree.tsx` | File tree display component |
-| `frontend/src/hooks/useFiles.ts` | Hook to fetch files (may need connecting) |
+| `PRODUCT_VISION.md` | Add new Theme 6 for multi-agent experience |
+| `.claude/work/design/multi-agent-chat-ux-strategy.md` | Full design strategy for multi-agent UX |
+| `.claude/agents/` | Existing agent definitions to map to chat personas |
+| `backend/internal/service/claude.go` | Will need updates for multi-agent routing |
+| `frontend/src/components/chat/MessageBubble.tsx` | Will need agent visual treatment |
 
-## Environment Setup
+## Key Decisions Made This Session
 
-```bash
-# Terminal 1 - Database (already running in Podman)
-# Container has files table from migration 002
+1. **File Tree Working** - Files now save and display in right sidebar
+2. **Navigation Fixed** - Clicking projects navigates to `/projects/{id}`
+3. **Product Vision v2.0** - Added:
+   - "People first, product second" principle
+   - Guided Discovery theme
+   - App Map concept
+   - 2-tier file reveal
+   - 3-level view progression
+   - 11 product principles
 
-# Terminal 2 - Backend (port 8081)
-cd backend
-export PORT=8081
-export DATABASE_URL="postgres://gochat:gochat@localhost:5432/gochat?sslmode=disable"
-export CLAUDE_API_KEY="sk-ant-..."
-go run ./cmd/server
+4. **Multi-Agent Design** - Approved approach:
+   - Product Guide leads all conversations
+   - Specialists introduced contextually
+   - One voice at a time (no chaos)
+   - Visual distinction via colors/icons
+   - Optional @mentions for power users
 
-# Terminal 3 - Frontend (port 3001)
-cd frontend
-npm run dev -- -p 3001
-```
+## Git Status
+
+- **Branch**: `feature/app-map-discovery` (clean except design files)
+- **Main**: Up to date with MVP merged
+- **Uncommitted**: Multi-agent design strategy files
 
 ## Pending Work
 
-1. **Verify file saving works** with inference fallback
-2. **Connect frontend** to display files in sidebar
-3. **Test FilePill components** in chat messages
-4. **Commit all changes** to git
+1. Add multi-agent theme to PRODUCT_VISION.md
+2. Design and implement guided discovery flow
+3. Implement App Map / functional file groupings
+4. Build 2-tier file reveal system
+5. Add file metadata to database schema
+6. Update Claude prompt to generate descriptions
 
-## Quick Status
+## Environment
 
-- Phase 1 Foundation: Complete
-- Phase 1 Polish: Complete
-- File Tree Backend: Implemented, needs testing
-- File Tree Frontend: Components exist, need API connection
-- Git: Many uncommitted changes
+```bash
+# Backend (port 8081)
+cd backend && go run ./cmd/server
+
+# Frontend (port 3001)
+cd frontend && npm run dev -- -p 3001
+
+# Database running in Podman
+```
 
 ## Suggested First Action
 
-Restart backend and test file creation with: "Create index.html with hello world"
+Read the multi-agent design strategy, then add it as Theme 6 to PRODUCT_VISION.md:
+
+```bash
+# Read the design
+cat .claude/work/design/multi-agent-chat-ux-strategy.md
+
+# Then edit PRODUCT_VISION.md to add Theme 6
+```

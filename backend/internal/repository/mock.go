@@ -156,3 +156,110 @@ func (r *MockProjectRepository) CreateMessage(ctx context.Context, projectID uui
 
 	return &message, nil
 }
+
+// MockFileRepository implements FileRepository for testing.
+type MockFileRepository struct {
+	mu    sync.RWMutex
+	files map[uuid.UUID]*model.File       // keyed by file ID
+	byPath map[string]uuid.UUID           // projectID:path -> fileID lookup
+}
+
+// NewMockFileRepository creates a new MockFileRepository.
+func NewMockFileRepository() *MockFileRepository {
+	return &MockFileRepository{
+		files:  make(map[uuid.UUID]*model.File),
+		byPath: make(map[string]uuid.UUID),
+	}
+}
+
+// makePathKey creates a unique key for project+path combination.
+func makePathKey(projectID uuid.UUID, path string) string {
+	return projectID.String() + ":" + path
+}
+
+// SaveFile saves or updates a file for a project (upsert by project_id + path).
+func (r *MockFileRepository) SaveFile(ctx context.Context, projectID uuid.UUID, path, language, content string) (*model.File, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	pathKey := makePathKey(projectID, path)
+	now := time.Now().UTC()
+
+	// Check if file already exists
+	if fileID, exists := r.byPath[pathKey]; exists {
+		file := r.files[fileID]
+		file.Language = language
+		file.Content = content
+		file.CreatedAt = now // matches upsert behavior in real repo
+		return file, nil
+	}
+
+	// Create new file
+	file := &model.File{
+		ID:        uuid.New(),
+		ProjectID: projectID,
+		Path:      path,
+		Filename:  path, // simplified for mock
+		Language:  language,
+		Content:   content,
+		CreatedAt: now,
+	}
+
+	r.files[file.ID] = file
+	r.byPath[pathKey] = file.ID
+
+	return file, nil
+}
+
+// GetFilesByProject returns all files for a project (without content).
+func (r *MockFileRepository) GetFilesByProject(ctx context.Context, projectID uuid.UUID) ([]model.FileListItem, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []model.FileListItem
+	for _, file := range r.files {
+		if file.ProjectID == projectID {
+			result = append(result, model.FileListItem{
+				ID:        file.ID,
+				Path:      file.Path,
+				Filename:  file.Filename,
+				Language:  file.Language,
+				CreatedAt: file.CreatedAt,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+// GetFile returns a file by ID.
+func (r *MockFileRepository) GetFile(ctx context.Context, id uuid.UUID) (*model.File, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	file, ok := r.files[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	return file, nil
+}
+
+// GetFileByPath returns a file by project ID and path.
+func (r *MockFileRepository) GetFileByPath(ctx context.Context, projectID uuid.UUID, path string) (*model.File, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	pathKey := makePathKey(projectID, path)
+	fileID, exists := r.byPath[pathKey]
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	file, ok := r.files[fileID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	return file, nil
+}

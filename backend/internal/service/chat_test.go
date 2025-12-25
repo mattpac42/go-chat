@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,10 +55,10 @@ func TestChatService_ProcessMessage_Success(t *testing.T) {
 		t.Fatalf("failed to create project: %v", err)
 	}
 
-	// Create chat service
+	// Create chat service (nil for fileRepo and fileMetadataRepo in basic tests)
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	// Collect chunks
 	var chunks []string
@@ -152,7 +153,7 @@ func TestChatService_ProcessMessage_WithContext(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	// Process a new message
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Second message", func(string) {})
@@ -212,7 +213,7 @@ func TestChatService_ProcessMessage_ContextLimit(t *testing.T) {
 	// Set limit to 10
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 10,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "New message", func(string) {})
 	if err != nil {
@@ -241,7 +242,7 @@ func TestChatService_ProcessMessage_ProjectNotFound(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	ctx := context.Background()
 	nonExistentID := uuid.New()
@@ -284,7 +285,7 @@ func TestChatService_ProcessMessage_CodeBlockExtraction(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	result, err := chatService.ProcessMessage(ctx, project.ID, "Show me code", func(string) {})
 	if err != nil {
@@ -328,10 +329,200 @@ func TestChatService_ProcessMessage_Timeout(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, logger)
+	}, claudeService, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
 	if err == nil {
 		t.Fatal("expected timeout error")
+	}
+}
+
+func TestChatService_ProcessMessage_FileMetadataExtraction(t *testing.T) {
+	// Create a mock Claude server that returns files with YAML front matter metadata
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		// Response with code blocks containing YAML front matter metadata
+		responseContent := `Here is your homepage:
+
+` + "```html:index.html" + `
+---
+short_description: Main landing page structure
+long_description: The homepage HTML with navigation and hero section.
+functional_group: Homepage
+---
+<!DOCTYPE html>
+<html>
+<head><title>Home</title></head>
+<body><h1>Welcome</h1></body>
+</html>
+` + "```" + `
+
+And here is the styling:
+
+` + "```css:styles.css" + `
+---
+short_description: Homepage styles
+long_description: CSS rules for the homepage layout and typography.
+functional_group: Homepage
+---
+body { margin: 0; padding: 0; }
+h1 { color: blue; }
+` + "```"
+
+		// Properly escape for JSON
+		escaped := strings.ReplaceAll(responseContent, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"` + escaped + `"}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	repo := repository.NewMockProjectRepository()
+	fileRepo := repository.NewMockFileRepository()
+	fileMetadataRepo := repository.NewMockFileMetadataRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	ctx := context.Background()
+	project, _ := repo.Create(ctx, "Test Project")
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, repo, fileRepo, fileMetadataRepo, logger)
+
+	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a homepage", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify files were saved
+	files, err := fileRepo.GetFilesByProject(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("failed to get files: %v", err)
+	}
+
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+
+	// Verify metadata was saved for the files
+	// Get the actual file IDs to query metadata
+	htmlFile, err := fileRepo.GetFileByPath(ctx, project.ID, "index.html")
+	if err != nil {
+		t.Fatalf("failed to get index.html: %v", err)
+	}
+
+	htmlMetadata, err := fileMetadataRepo.GetByFileID(ctx, htmlFile.ID)
+	if err != nil {
+		t.Fatalf("failed to get metadata for index.html: %v", err)
+	}
+
+	if htmlMetadata.ShortDescription != "Main landing page structure" {
+		t.Errorf("expected short_description 'Main landing page structure', got '%s'", htmlMetadata.ShortDescription)
+	}
+	if htmlMetadata.FunctionalGroup != "Homepage" {
+		t.Errorf("expected functional_group 'Homepage', got '%s'", htmlMetadata.FunctionalGroup)
+	}
+
+	cssFile, err := fileRepo.GetFileByPath(ctx, project.ID, "styles.css")
+	if err != nil {
+		t.Fatalf("failed to get styles.css: %v", err)
+	}
+
+	cssMetadata, err := fileMetadataRepo.GetByFileID(ctx, cssFile.ID)
+	if err != nil {
+		t.Fatalf("failed to get metadata for styles.css: %v", err)
+	}
+
+	if cssMetadata.ShortDescription != "Homepage styles" {
+		t.Errorf("expected short_description 'Homepage styles', got '%s'", cssMetadata.ShortDescription)
+	}
+	if cssMetadata.FunctionalGroup != "Homepage" {
+		t.Errorf("expected functional_group 'Homepage', got '%s'", cssMetadata.FunctionalGroup)
+	}
+}
+
+func TestChatService_ProcessMessage_FileWithoutMetadata(t *testing.T) {
+	// Create a mock Claude server that returns files WITHOUT metadata
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		// Response with code blocks without YAML front matter
+		responseContent := `Here is your script:
+
+` + "```javascript:app.js" + `
+console.log('Hello World');
+` + "```"
+
+		escaped := strings.ReplaceAll(responseContent, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"` + escaped + `"}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	repo := repository.NewMockProjectRepository()
+	fileRepo := repository.NewMockFileRepository()
+	fileMetadataRepo := repository.NewMockFileMetadataRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	ctx := context.Background()
+	project, _ := repo.Create(ctx, "Test Project")
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, repo, fileRepo, fileMetadataRepo, logger)
+
+	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a script", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify file was saved
+	jsFile, err := fileRepo.GetFileByPath(ctx, project.ID, "app.js")
+	if err != nil {
+		t.Fatalf("failed to get app.js: %v", err)
+	}
+
+	// Verify the file content doesn't include the metadata (should just be the code)
+	expectedContent := "console.log('Hello World');"
+	if jsFile.Content != expectedContent {
+		t.Errorf("expected content '%s', got '%s'", expectedContent, jsFile.Content)
+	}
+
+	// Verify NO metadata was saved for this file (since it had none)
+	_, err = fileMetadataRepo.GetByFileID(ctx, jsFile.ID)
+	if err != repository.ErrNotFound {
+		t.Errorf("expected ErrNotFound for file without metadata, got: %v", err)
 	}
 }

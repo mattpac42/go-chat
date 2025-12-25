@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ProjectList } from '@/components/projects/ProjectList';
 import { ChatContainer } from '@/components/chat/ChatContainer';
-import { FileTree } from '@/components/projects/FileTree';
+import { FileExplorer } from '@/components/projects/FileExplorer';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useProjects, useProject } from '@/hooks/useProjects';
 import { useFiles } from '@/hooks/useFiles';
@@ -35,6 +35,7 @@ export function ProjectPageClient() {
     fileTree,
     isLoading: isLoadingFiles,
     fetchFiles,
+    getFile,
   } = useFiles(projectId);
 
   console.log('[ProjectPageClient] fileTree:', fileTree, 'isLoadingFiles:', isLoadingFiles);
@@ -170,19 +171,22 @@ export function ProjectPageClient() {
         )}
       </main>
 
-      {/* Right sidebar - Files */}
-      <aside className="hidden md:flex md:w-60 md:flex-shrink-0 border-l border-gray-200 bg-white flex-col">
+      {/* Right sidebar - Files with 2-tier reveal system */}
+      <aside className="hidden lg:flex lg:w-80 lg:flex-shrink-0 border-l border-gray-200 bg-white flex-col">
         <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-700">Files</h2>
+          <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Click to see what each file does
+          </p>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {isLoadingFiles ? (
-            <div className="flex items-center justify-center py-8">
-              <LoadingSpinner size="sm" />
-            </div>
-          ) : (
-            <FileTree files={fileTree} />
-          )}
+        <div className="flex-1 overflow-hidden">
+          <FileExplorer
+            files={fileTree}
+            onLoadContent={getFile}
+            defaultViewMode="reveal"
+            showViewToggle={true}
+            isLoading={isLoadingFiles}
+          />
         </div>
       </aside>
     </div>

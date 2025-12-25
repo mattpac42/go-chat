@@ -38,6 +38,24 @@ export interface FileNode {
   language?: string;
   content?: string;
   children?: FileNode[];
+  /** Tier 1: Human-readable short description of what the file does */
+  shortDescription?: string;
+  /** Tier 1: Longer explanation of the file's purpose and why it exists */
+  longDescription?: string;
+  /** Functional group for App Map organization (e.g., "Homepage", "Backend Services") */
+  functionalGroup?: string;
+}
+
+/**
+ * File metadata for the 2-tier reveal system
+ * Tier 1: Human-readable descriptions (shown by default)
+ * Tier 2: Actual code (shown on user request)
+ */
+export interface FileMetadata {
+  shortDescription: string;
+  longDescription: string;
+  language: string;
+  functionalGroup: string;
 }
 
 // WebSocket message types

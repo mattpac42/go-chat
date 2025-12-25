@@ -24,11 +24,12 @@ type ChatConfig struct {
 
 // ChatService orchestrates chat interactions between WebSocket, Claude, and database.
 type ChatService struct {
-	config        ChatConfig
-	claudeService *ClaudeService
-	repo          repository.ProjectRepository
-	fileRepo      repository.FileRepository
-	logger        zerolog.Logger
+	config           ChatConfig
+	claudeService    *ClaudeService
+	repo             repository.ProjectRepository
+	fileRepo         repository.FileRepository
+	fileMetadataRepo repository.FileMetadataRepository
+	logger           zerolog.Logger
 }
 
 // NewChatService creates a new chat service.
@@ -37,17 +38,19 @@ func NewChatService(
 	claudeService *ClaudeService,
 	repo repository.ProjectRepository,
 	fileRepo repository.FileRepository,
+	fileMetadataRepo repository.FileMetadataRepository,
 	logger zerolog.Logger,
 ) *ChatService {
 	if config.ContextMessageLimit <= 0 {
 		config.ContextMessageLimit = 20
 	}
 	return &ChatService{
-		config:        config,
-		claudeService: claudeService,
-		repo:          repo,
-		fileRepo:      fileRepo,
-		logger:        logger,
+		config:           config,
+		claudeService:    claudeService,
+		repo:             repo,
+		fileRepo:         fileRepo,
+		fileMetadataRepo: fileMetadataRepo,
+		logger:           logger,
 	}
 }
 
@@ -116,11 +119,11 @@ func (s *ChatService) ProcessMessage(
 
 	responseContent := fullResponse.String()
 
-	// Extract code blocks from response
-	markdownBlocks := markdown.ExtractCodeBlocks(responseContent)
+	// Extract code blocks with metadata from response
+	markdownBlocks := markdown.ExtractCodeBlocksWithMetadata(responseContent)
 
 	// Try to infer filenames from user message if Claude didn't provide them
-	markdownBlocks = inferFilenamesFromUserMessage(content, markdownBlocks)
+	markdownBlocks = inferFilenamesFromUserMessageWithMetadata(content, markdownBlocks)
 
 	codeBlocks := make([]model.CodeBlock, len(markdownBlocks))
 	for i, block := range markdownBlocks {
@@ -131,10 +134,12 @@ func (s *ChatService) ProcessMessage(
 			EndIndex:   block.EndIndex,
 		}
 		// Log each extracted code block for debugging
+		hasMetadata := block.Metadata != nil
 		s.logger.Info().
 			Str("projectId", projectID.String()).
 			Str("language", block.Language).
 			Str("filename", block.Filename).
+			Bool("hasMetadata", hasMetadata).
 			Int("codeLength", len(block.Code)).
 			Msg("extracted code block")
 	}
@@ -143,18 +148,43 @@ func (s *ChatService) ProcessMessage(
 	if s.fileRepo != nil {
 		for _, block := range markdownBlocks {
 			if block.Filename != "" {
-				_, err := s.fileRepo.SaveFile(ctx, projectID, block.Filename, block.Language, block.Code)
+				file, err := s.fileRepo.SaveFile(ctx, projectID, block.Filename, block.Language, block.Code)
 				if err != nil {
 					s.logger.Warn().
 						Err(err).
 						Str("projectId", projectID.String()).
 						Str("filename", block.Filename).
 						Msg("failed to save extracted file")
-				} else {
-					s.logger.Info().
-						Str("projectId", projectID.String()).
-						Str("filename", block.Filename).
-						Msg("saved extracted file")
+					continue
+				}
+
+				s.logger.Info().
+					Str("projectId", projectID.String()).
+					Str("filename", block.Filename).
+					Msg("saved extracted file")
+
+				// Save metadata if available and repository is configured
+				if block.Metadata != nil && s.fileMetadataRepo != nil {
+					_, err := s.fileMetadataRepo.Upsert(
+						ctx,
+						file.ID,
+						block.Metadata.ShortDescription,
+						block.Metadata.LongDescription,
+						block.Metadata.FunctionalGroup,
+					)
+					if err != nil {
+						s.logger.Warn().
+							Err(err).
+							Str("projectId", projectID.String()).
+							Str("filename", block.Filename).
+							Msg("failed to save file metadata")
+					} else {
+						s.logger.Info().
+							Str("projectId", projectID.String()).
+							Str("filename", block.Filename).
+							Str("functionalGroup", block.Metadata.FunctionalGroup).
+							Msg("saved file metadata")
+					}
 				}
 			} else {
 				s.logger.Info().
@@ -205,9 +235,10 @@ func (s *ChatService) buildClaudeMessages(messages []model.Message) []ClaudeMess
 	return claudeMessages
 }
 
-// inferFilenamesFromUserMessage extracts filenames mentioned in the user's message
+// inferFilenamesFromUserMessageWithMetadata extracts filenames mentioned in the user's message
 // and assigns them to code blocks based on matching file extensions.
-func inferFilenamesFromUserMessage(userMessage string, blocks []markdown.CodeBlock) []markdown.CodeBlock {
+// This version works with CodeBlockWithMetadata which includes App Map metadata.
+func inferFilenamesFromUserMessageWithMetadata(userMessage string, blocks []markdown.CodeBlockWithMetadata) []markdown.CodeBlockWithMetadata {
 	// Find all filenames mentioned in the user message
 	matches := filenamePattern.FindAllString(userMessage, -1)
 	if len(matches) == 0 {
@@ -240,7 +271,7 @@ func inferFilenamesFromUserMessage(userMessage string, blocks []markdown.CodeBlo
 	}
 
 	// Assign filenames to blocks that don't have one
-	result := make([]markdown.CodeBlock, len(blocks))
+	result := make([]markdown.CodeBlockWithMetadata, len(blocks))
 	usedFilenames := make(map[string]bool)
 
 	for i, block := range blocks {

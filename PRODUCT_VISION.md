@@ -275,7 +275,52 @@ This 12-month vision focuses on proving the core concept and achieving product-m
 
 ---
 
-### Theme 6: Multi-Tenant Platform Architecture
+### Theme 6: Multi-Agent Team Experience
+
+**Objective**: Transform the single-AI conversation into a collaborative team experience where specialized agents work together, guided by a Product Guide, making users feel they are working with a friendly team of experts.
+
+**Target Users**: Sam (primary), Alex (secondary)
+
+**Value Delivered**: Users experience the richness of multiple expert perspectives (product, UX, architecture, development) without the chaos of uncoordinated AI responses. The team model feels human-like and approachable, building trust and understanding.
+
+**Feature Domains**:
+- **Coordinated Team Model**:
+  - Product Guide leads all conversations and maintains context
+  - Specialists (UX Expert, Architect, Developer, Researcher) introduced contextually
+  - One-voice-at-a-time rule prevents information overload
+  - Guide summarizes and synthesizes multi-agent input
+- **Visual Agent Distinction**:
+  - Each agent has icon, accent color, and role label
+  - Subtle left border accent (not full bubble color change)
+  - Professional role labels ("UX Expert" not human names)
+  - Consistent bubble style with agent-specific accents
+- **Progressive Agent Introduction**:
+  - Discovery phase: Product Guide only
+  - Design phase: Introduce UX Expert
+  - Architecture phase: Introduce Architect
+  - Implementation phase: Introduce Developer
+  - [NEW] badge on agent's first appearance
+- **Optional @Mention System**:
+  - Users can @mention specific agents for direct questions
+  - Auto-routing as default (Guide handles routing)
+  - Quick-access bar on mobile for agent selection
+- **Agent States**:
+  - Active: Currently participating
+  - Available: Introduced, can be @mentioned
+  - Later: Not yet relevant (shown only in team drawer)
+  - Thinking: Generating response (pulsing indicator)
+
+**Success Metrics**:
+- User comprehension of agent roles (target: 80%+ can identify role purpose)
+- Agent hand-off smoothness (target: <5% report confusion)
+- User preference vs. single agent (target: 70%+ prefer multi-agent in A/B test)
+- Mobile engagement with team features (target: 60%+ view team drawer)
+
+**Priority**: High | **Dependencies**: Theme 2 (Conversational Development) provides the chat foundation
+
+---
+
+### Theme 7: Multi-Tenant Platform Architecture
 
 **Objective**: Build a platform architecture that supports multiple users/organizations with proper isolation, preparing for productization.
 
@@ -536,3 +581,4 @@ This 12-month vision focuses on proving the core concept and achieving product-m
 |------|---------|---------|--------|
 | 2025-12-23 | 1.0 | Initial vision from discovery interview | Product Strategy |
 | 2025-12-25 | 2.0 | Added Guided Discovery theme, App Map concept, 3-level view progression, 2-tier file reveal, learning journey theme, updated principles for "teach, don't just build" philosophy | Product Strategy |
+| 2025-12-25 | 2.1 | Added Theme 6: Multi-Agent Team Experience - coordinated team model with Product Guide leading, visual agent distinction, progressive agent introduction, @mention system | Product Strategy |
