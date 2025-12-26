@@ -74,6 +74,7 @@ func main() {
 	healthHandler := handler.NewHealthHandler(db)
 	projectHandler := handler.NewProjectHandler(projectRepo)
 	fileHandler := handler.NewFileHandler(fileRepo, projectRepo, fileMetadataRepo)
+	discoveryHandler := handler.NewDiscoveryHandler(discoveryService, logger)
 	wsHandler := handler.NewWebSocketHandler(chatService, logger)
 
 	// Set up Gin
@@ -105,6 +106,15 @@ func main() {
 			projects.DELETE("/:id", projectHandler.Delete)
 			projects.GET("/:id/files", fileHandler.ListFiles)
 			projects.GET("/:id/download", fileHandler.DownloadProjectZip)
+
+			// Discovery routes
+			projects.GET("/:id/discovery", discoveryHandler.GetDiscovery)
+			projects.PUT("/:id/discovery/stage", discoveryHandler.AdvanceStage)
+			projects.PUT("/:id/discovery/data", discoveryHandler.UpdateData)
+			projects.POST("/:id/discovery/users", discoveryHandler.AddUser)
+			projects.POST("/:id/discovery/features", discoveryHandler.AddFeature)
+			projects.POST("/:id/discovery/confirm", discoveryHandler.ConfirmDiscovery)
+			projects.DELETE("/:id/discovery", discoveryHandler.ResetDiscovery)
 		}
 		files := api.Group("/files")
 		{
