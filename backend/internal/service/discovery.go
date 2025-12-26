@@ -423,7 +423,7 @@ func (s *DiscoveryService) renameProjectFromDiscovery(ctx context.Context, disco
 	projectName := *updatedDiscovery.ProjectName
 
 	// Update the project title
-	if err := s.projectRepo.Update(ctx, discovery.ProjectID, projectName); err != nil {
+	if _, err := s.projectRepo.UpdateTitle(ctx, discovery.ProjectID, projectName); err != nil {
 		s.logger.Warn().
 			Err(err).
 			Str("projectId", discovery.ProjectID.String()).
