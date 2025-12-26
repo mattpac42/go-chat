@@ -49,13 +49,16 @@ function buildFileTree(files: FileItem[]): FileNode[] {
       currentLevel = folderNode.children!;
     }
 
-    // Add the file node
+    // Add the file node with metadata
     const fileNode: FileNode = {
       id: file.id,
       name: file.filename,
       path: file.path,
       type: 'file',
       language: file.language,
+      shortDescription: file.shortDescription,
+      longDescription: file.longDescription,
+      functionalGroup: file.functionalGroup,
     };
     currentLevel.push(fileNode);
   }

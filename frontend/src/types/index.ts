@@ -23,6 +23,10 @@ export interface FileItem {
   filename: string;
   language?: string;
   createdAt: string;
+  // Metadata from App Map
+  shortDescription?: string;
+  longDescription?: string;
+  functionalGroup?: string;
 }
 
 export interface FileWithContent extends FileItem {

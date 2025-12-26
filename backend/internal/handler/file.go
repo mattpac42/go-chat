@@ -11,19 +11,21 @@ import (
 
 // FileHandler handles file-related endpoints.
 type FileHandler struct {
-	fileRepo    repository.FileRepository
-	projectRepo repository.ProjectRepository
+	fileRepo         repository.FileRepository
+	projectRepo      repository.ProjectRepository
+	fileMetadataRepo repository.FileMetadataRepository
 }
 
 // NewFileHandler creates a new FileHandler.
-func NewFileHandler(fileRepo repository.FileRepository, projectRepo repository.ProjectRepository) *FileHandler {
+func NewFileHandler(fileRepo repository.FileRepository, projectRepo repository.ProjectRepository, fileMetadataRepo repository.FileMetadataRepository) *FileHandler {
 	return &FileHandler{
-		fileRepo:    fileRepo,
-		projectRepo: projectRepo,
+		fileRepo:         fileRepo,
+		projectRepo:      projectRepo,
+		fileMetadataRepo: fileMetadataRepo,
 	}
 }
 
-// ListFiles returns all files for a project.
+// ListFiles returns all files for a project with metadata.
 // GET /api/projects/:id/files
 func (h *FileHandler) ListFiles(c *gin.Context) {
 	idParam := c.Param("id")
@@ -44,6 +46,33 @@ func (h *FileHandler) ListFiles(c *gin.Context) {
 		return
 	}
 
+	// Try to get files with metadata first
+	if h.fileMetadataRepo != nil {
+		filesWithMetadata, err := h.fileMetadataRepo.GetFilesWithMetadata(c.Request.Context(), projectID)
+		if err == nil {
+			// Convert to response format
+			result := make([]model.FileListItemWithMetadata, len(filesWithMetadata))
+			for i, f := range filesWithMetadata {
+				result[i] = model.FileListItemWithMetadata{
+					ID:               f.ID,
+					Path:             f.Path,
+					Filename:         f.Filename,
+					Language:         f.Language,
+					ShortDescription: f.ShortDescription,
+					LongDescription:  f.LongDescription,
+					FunctionalGroup:  f.FunctionalGroup,
+					CreatedAt:        f.CreatedAt,
+				}
+			}
+			c.JSON(http.StatusOK, model.ListFilesWithMetadataResponse{
+				Files: result,
+			})
+			return
+		}
+		// Fall through to basic files if metadata query fails
+	}
+
+	// Fallback to basic file list (without metadata)
 	files, err := h.fileRepo.GetFilesByProject(c.Request.Context(), projectID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list files"})

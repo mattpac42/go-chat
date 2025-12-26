@@ -2,7 +2,13 @@
 
 import { useState, useCallback } from 'react';
 import { FileNode, FileWithContent } from '@/types';
-import { FileRevealCard } from './FileRevealCard';
+import { FileRevealCard, RevealTier } from './FileRevealCard';
+
+// Track file expansion state
+interface FileState {
+  tier: RevealTier;
+  pinned: boolean; // true if user explicitly expanded via chevron/code button
+}
 
 interface FileRevealListProps {
   files: FileNode[];
@@ -64,6 +70,9 @@ interface FolderSectionProps {
   onLoadContent?: (fileId: string) => Promise<FileWithContent | null>;
   expandedFiles: Set<string>;
   onToggleFile: (fileId: string) => void;
+  getFileTier: (fileId: string) => RevealTier;
+  onCardClick: (fileId: string, hasLongDesc: boolean) => void;
+  onIntentionalExpand: (fileId: string, tier: RevealTier) => void;
 }
 
 function FolderSection({
@@ -72,6 +81,9 @@ function FolderSection({
   onLoadContent,
   expandedFiles,
   onToggleFile,
+  getFileTier,
+  onCardClick,
+  onIntentionalExpand,
 }: FolderSectionProps) {
   const [isOpen, setIsOpen] = useState(depth < 2); // Auto-expand first two levels
 
@@ -109,6 +121,9 @@ function FolderSection({
               onLoadContent={onLoadContent}
               expandedFiles={expandedFiles}
               onToggleFile={onToggleFile}
+              getFileTier={getFileTier}
+              onCardClick={onCardClick}
+              onIntentionalExpand={onIntentionalExpand}
             />
           ))}
 
@@ -118,8 +133,9 @@ function FolderSection({
               key={file.id}
               file={file}
               onLoadContent={onLoadContent}
-              isExpanded={expandedFiles.has(file.id)}
-              onToggleExpand={() => onToggleFile(file.id)}
+              tier={getFileTier(file.id)}
+              onCardClick={() => onCardClick(file.id, !!file.longDescription)}
+              onIntentionalExpand={(tier) => onIntentionalExpand(file.id, tier)}
             />
           ))}
         </div>
@@ -132,16 +148,18 @@ interface FunctionalGroupSectionProps {
   groupName: string;
   files: FileNode[];
   onLoadContent?: (fileId: string) => Promise<FileWithContent | null>;
-  expandedFiles: Set<string>;
-  onToggleFile: (fileId: string) => void;
+  getFileTier: (fileId: string) => RevealTier;
+  onCardClick: (fileId: string, hasLongDesc: boolean) => void;
+  onIntentionalExpand: (fileId: string, tier: RevealTier) => void;
 }
 
 function FunctionalGroupSection({
   groupName,
   files,
   onLoadContent,
-  expandedFiles,
-  onToggleFile,
+  getFileTier,
+  onCardClick,
+  onIntentionalExpand,
 }: FunctionalGroupSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -182,8 +200,9 @@ function FunctionalGroupSection({
               key={file.id}
               file={file}
               onLoadContent={onLoadContent}
-              isExpanded={expandedFiles.has(file.id)}
-              onToggleExpand={() => onToggleFile(file.id)}
+              tier={getFileTier(file.id)}
+              onCardClick={() => onCardClick(file.id, !!file.longDescription)}
+              onIntentionalExpand={(tier) => onIntentionalExpand(file.id, tier)}
             />
           ))}
         </div>
@@ -272,15 +291,54 @@ export function FileRevealList({
   groupByFunction = false,
   showEmptyState = true,
 }: FileRevealListProps) {
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  const [fileStates, setFileStates] = useState<Map<string, FileState>>(new Map());
 
+  // Get tier for a file
+  const getFileTier = useCallback((fileId: string): RevealTier => {
+    return fileStates.get(fileId)?.tier ?? 'collapsed';
+  }, [fileStates]);
+
+  // Handle casual card click - collapse non-pinned files, toggle this file (collapsed <-> details only)
+  const handleCardClick = useCallback((fileId: string, hasLongDesc: boolean) => {
+    setFileStates((prev) => {
+      const next = new Map(prev);
+
+      // Collapse all non-pinned files
+      next.forEach((state, id) => {
+        if (id !== fileId && !state.pinned) {
+          next.set(id, { tier: 'collapsed', pinned: false });
+        }
+      });
+
+      // Toggle this file's tier between collapsed and details only (not code)
+      const current = prev.get(fileId)?.tier ?? 'collapsed';
+      let nextTier: RevealTier;
+      if (current === 'collapsed') nextTier = hasLongDesc ? 'details' : 'collapsed';
+      else nextTier = 'collapsed'; // from details or code -> collapsed
+
+      next.set(fileId, { tier: nextTier, pinned: false });
+      return next;
+    });
+  }, []);
+
+  // Handle intentional expand (chevron/code button) - pins the file open
+  const handleIntentionalExpand = useCallback((fileId: string, tier: RevealTier) => {
+    setFileStates((prev) => {
+      const next = new Map(prev);
+      next.set(fileId, { tier, pinned: tier !== 'collapsed' });
+      return next;
+    });
+  }, []);
+
+  // Legacy handler for folder sections (simplified)
   const handleToggleFile = useCallback((fileId: string) => {
-    setExpandedFiles((prev) => {
-      const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
+    setFileStates((prev) => {
+      const next = new Map(prev);
+      const current = prev.get(fileId);
+      if (current && current.tier !== 'collapsed') {
+        next.set(fileId, { tier: 'collapsed', pinned: false });
       } else {
-        next.add(fileId);
+        next.set(fileId, { tier: 'details', pinned: true });
       }
       return next;
     });
@@ -324,8 +382,9 @@ export function FileRevealList({
             groupName={groupName}
             files={groupFiles}
             onLoadContent={onLoadContent}
-            expandedFiles={expandedFiles}
-            onToggleFile={handleToggleFile}
+            getFileTier={getFileTier}
+            onCardClick={handleCardClick}
+            onIntentionalExpand={handleIntentionalExpand}
           />
         ))}
       </div>
@@ -335,6 +394,13 @@ export function FileRevealList({
   // Folder structure view
   const rootFolders = files.filter((f) => f.type === 'folder');
   const rootFiles = files.filter((f) => f.type === 'file');
+
+  // Convert fileStates to expandedFiles for legacy FolderSection
+  const expandedFiles = new Set(
+    Array.from(fileStates.entries())
+      .filter(([, state]) => state.tier !== 'collapsed')
+      .map(([id]) => id)
+  );
 
   return (
     <div className="space-y-2">
@@ -347,6 +413,9 @@ export function FileRevealList({
           onLoadContent={onLoadContent}
           expandedFiles={expandedFiles}
           onToggleFile={handleToggleFile}
+          getFileTier={getFileTier}
+          onCardClick={handleCardClick}
+          onIntentionalExpand={handleIntentionalExpand}
         />
       ))}
 
@@ -356,8 +425,9 @@ export function FileRevealList({
           key={file.id}
           file={file}
           onLoadContent={onLoadContent}
-          isExpanded={expandedFiles.has(file.id)}
-          onToggleExpand={() => handleToggleFile(file.id)}
+          tier={getFileTier(file.id)}
+          onCardClick={() => handleCardClick(file.id, !!file.longDescription)}
+          onIntentionalExpand={(tier) => handleIntentionalExpand(file.id, tier)}
         />
       ))}
     </div>

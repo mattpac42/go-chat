@@ -29,7 +29,7 @@ export function ProjectPageClient() {
     messages: initialMessages,
     isLoading: isLoadingProject,
     error: projectError,
-  } = useProject(projectId);
+  } = useProject(projectId, projects);
 
   const {
     fileTree,

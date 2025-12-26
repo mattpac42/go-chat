@@ -6,9 +6,15 @@ import { FileNode, FileWithContent } from '@/types';
 interface FileRevealCardProps {
   file: FileNode;
   onLoadContent?: (fileId: string) => Promise<FileWithContent | null>;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
+  /** Current tier state (controlled) */
+  tier?: RevealTier;
+  /** Called when user clicks card (cycles tiers) */
+  onCardClick?: () => void;
+  /** Called when user explicitly expands via chevron/code (should "pin" open) */
+  onIntentionalExpand?: (tier: RevealTier) => void;
 }
+
+type RevealTier = 'collapsed' | 'details' | 'code';
 
 /**
  * File extension to language display name mapping
@@ -231,45 +237,91 @@ function LoadingSpinner({ className }: { className?: string }) {
 }
 
 /**
- * FileRevealCard - 2-tier file reveal system
+ * FileRevealCard - 3-tier file reveal system
  *
- * Tier 1 (default): Shows human-readable description of what the file does
- * Tier 2 (expanded): Shows actual code with syntax highlighting
+ * Tier 1 (collapsed): File name + short description only
+ * Tier 2 (details): Shows long description
+ * Tier 3 (code): Shows code (long description stays visible for context)
+ *
+ * Linear progression: collapsed -> details -> code -> collapsed
  */
+export { type RevealTier };
+
 export function FileRevealCard({
   file,
   onLoadContent,
-  isExpanded: controlledExpanded,
-  onToggleExpand,
+  tier: controlledTier,
+  onCardClick,
+  onIntentionalExpand,
 }: FileRevealCardProps) {
-  const [internalExpanded, setInternalExpanded] = useState(false);
+  const [internalTier, setInternalTier] = useState<RevealTier>('collapsed');
   const [content, setContent] = useState<string | null>(file.content || null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLPreElement>(null);
 
-  // Support both controlled and uncontrolled modes
-  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  // Support controlled and uncontrolled modes
+  const tier = controlledTier ?? internalTier;
+  const setTier = (newTier: RevealTier) => {
+    if (controlledTier === undefined) {
+      setInternalTier(newTier);
+    }
+  };
 
   const accentColor = getAccentColor(file.name, file.language);
   const languageDisplay = getLanguageDisplay(file.name, file.language);
 
-  // Generate default description if not provided
   const shortDescription = file.shortDescription || generateDefaultDescription(file);
   const longDescription = file.longDescription;
+  const hasLongDescription = !!longDescription;
 
-  const handleToggle = useCallback(async () => {
-    const newExpanded = !isExpanded;
+  // Get next tier for chevron and card body click (toggle between collapsed <-> details only)
+  // Chevron should NOT cycle to code view - code is only accessible via the code button
+  const getNextTierToggle = useCallback((): RevealTier => {
+    // If in code view, go to collapsed
+    if (tier === 'code') return 'collapsed';
+    // If collapsed, go to details (or stay collapsed if no long description)
+    if (tier === 'collapsed') return hasLongDescription ? 'details' : 'collapsed';
+    // If in details, go back to collapsed
+    return 'collapsed';
+  }, [tier, hasLongDescription]);
 
-    if (onToggleExpand) {
-      onToggleExpand();
+  // Handle main card click - toggles between collapsed and details only (not code)
+  const handleCardClick = useCallback(() => {
+    const nextTier = getNextTierToggle();
+    if (onCardClick) {
+      onCardClick();
     } else {
-      setInternalExpanded(newExpanded);
+      setTier(nextTier);
+    }
+  }, [getNextTierToggle, onCardClick]);
+
+  // Handle chevron click - toggles between collapsed and details (not code)
+  const handleChevronClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextTier = getNextTierToggle();
+    if (onIntentionalExpand) {
+      onIntentionalExpand(nextTier);
+    } else {
+      setTier(nextTier);
+    }
+  }, [getNextTierToggle, onIntentionalExpand]);
+
+  // Handle code button click - jump to code or collapse
+  const handleViewCode = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const newTier: RevealTier = tier === 'code' ? 'collapsed' : 'code';
+
+    if (onIntentionalExpand) {
+      onIntentionalExpand(newTier);
+    } else {
+      setTier(newTier);
     }
 
-    // Load content when expanding if not already loaded
-    if (newExpanded && !content && onLoadContent) {
+    // Load content if going to code and not already loaded
+    if (newTier === 'code' && !content && onLoadContent) {
       setIsLoading(true);
       setError(null);
       try {
@@ -285,7 +337,7 @@ export function FileRevealCard({
         setIsLoading(false);
       }
     }
-  }, [isExpanded, content, file.id, onLoadContent, onToggleExpand]);
+  }, [tier, content, file.id, onLoadContent, onIntentionalExpand]);
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -303,20 +355,23 @@ export function FileRevealCard({
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (contentRef.current && isExpanded) {
+    if (contentRef.current && tier === 'code') {
       setContentHeight(contentRef.current.scrollHeight);
     }
-  }, [isExpanded, content]);
+  }, [tier, content]);
+
+  const showDetails = tier === 'details' || tier === 'code';
+  const showCode = tier === 'code';
 
   return (
     <div
-      className={`bg-white rounded-lg border-l-4 ${accentColor} shadow-sm hover:shadow-md transition-shadow duration-200`}
+      className={`bg-white rounded-lg border-l-4 ${accentColor} shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-teal-500 focus-within:ring-offset-1`}
     >
-      {/* Tier 1: Description Header (always visible) */}
+      {/* Tier 1: Header (always visible) - click to show/hide details */}
       <button
-        onClick={handleToggle}
-        className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-inset rounded-lg"
-        aria-expanded={isExpanded}
+        onClick={handleCardClick}
+        className="w-full text-left p-4 focus:outline-none rounded-t-lg"
+        aria-expanded={showDetails}
       >
         <div className="flex items-start gap-3">
           <FileTypeIcon filename={file.name} language={file.language} />
@@ -331,17 +386,10 @@ export function FileRevealCard({
               </span>
             </div>
 
-            {/* Short description - Tier 1 primary content */}
+            {/* Short description - always visible */}
             <p className="text-sm text-gray-600 leading-relaxed">
               {shortDescription}
             </p>
-
-            {/* Long description if available */}
-            {longDescription && (
-              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                {longDescription}
-              </p>
-            )}
 
             {/* Functional group badge if available */}
             {file.functionalGroup && (
@@ -351,21 +399,44 @@ export function FileRevealCard({
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-400 hidden sm:inline">
-              {isExpanded ? 'Hide code' : 'View code'}
-            </span>
-            <ChevronIcon isOpen={isExpanded} />
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Code icon - shortcut to code view */}
+            <button
+              onClick={handleViewCode}
+              className="p-1 rounded hover:bg-gray-100 transition-colors"
+              aria-label={showCode ? 'Hide code' : 'View code'}
+            >
+              <CodeIcon className={`w-4 h-4 ${showCode ? 'text-teal-500' : 'text-gray-400'}`} />
+            </button>
+            {/* Chevron - always visible, cycles through tiers */}
+            <button
+              onClick={handleChevronClick}
+              className="p-1 rounded hover:bg-gray-100 transition-colors"
+              aria-label={tier === 'collapsed' ? 'Expand' : 'Collapse'}
+            >
+              <ChevronIcon isOpen={showDetails || showCode} />
+            </button>
           </div>
         </div>
       </button>
 
-      {/* Tier 2: Code Content (expandable) */}
+      {/* Tier 2: Long Description (stays visible with code for context) */}
+      {hasLongDescription && (showDetails || showCode) && (
+        <div className="px-4 pb-4 pt-0">
+          <div className="pl-8 border-l-2 border-gray-100 ml-2">
+            <p className="text-sm text-gray-500 leading-relaxed">
+              {longDescription}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tier 3: Code Content (expandable) */}
       <div
         className="overflow-hidden transition-all duration-300 ease-in-out"
         style={{
-          maxHeight: isExpanded ? `${contentHeight + 100}px` : '0px',
-          opacity: isExpanded ? 1 : 0,
+          maxHeight: showCode ? `${contentHeight + 100}px` : '0px',
+          opacity: showCode ? 1 : 0,
         }}
       >
         <div ref={contentRef} className="border-t border-gray-100">

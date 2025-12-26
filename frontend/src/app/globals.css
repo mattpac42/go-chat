@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Remove backtick decorations from inline code (Tailwind Typography default) */
+.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *))::before,
+.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *))::after {
+  content: none;
+}
+
 /* Safe area support for mobile devices */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-area-pb {

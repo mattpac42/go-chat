@@ -147,12 +147,23 @@ export function useProjects(): UseProjectsReturn {
 
 /**
  * Hook for fetching a single project with messages
+ * Accepts optional projects array to sync title changes in real-time
  */
-export function useProject(projectId: string): UseProjectReturn {
+export function useProject(projectId: string, projects?: Project[]): UseProjectReturn {
   const [project, setProject] = useState<Project | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync project title when projects array updates (e.g., after rename)
+  useEffect(() => {
+    if (projects && project && projectId) {
+      const updatedProject = projects.find(p => p.id === projectId);
+      if (updatedProject && updatedProject.title !== project.title) {
+        setProject(prev => prev ? { ...prev, title: updatedProject.title } : prev);
+      }
+    }
+  }, [projects, project, projectId]);
 
   /**
    * Fetch project with messages from the API
