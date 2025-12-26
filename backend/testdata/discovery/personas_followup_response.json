@@ -1,0 +1,18 @@
+{
+  "stage": "personas",
+  "response": "So three people total:\n\n* You (the owner/baker)\n* Two employees who take orders\n\nShould your employees be able to do everything, or are there some things only you should handle - like seeing sales numbers or changing prices?",
+  "metadata": {
+    "stage_complete": true,
+    "next_stage": "mvp",
+    "extracted": {
+      "business_context": "Custom cake bakery that does custom cake orders",
+      "problem_statement": "Order tracking is chaos - uses paper and WhatsApp, things get lost",
+      "goals": ["See all orders in one place", "Track order status", "Know delivery schedules"],
+      "users": {
+        "description": "Owner/baker and two employees who take orders",
+        "count": 3,
+        "has_permissions": false
+      }
+    }
+  }
+}

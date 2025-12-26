@@ -55,10 +55,10 @@ func TestChatService_ProcessMessage_Success(t *testing.T) {
 		t.Fatalf("failed to create project: %v", err)
 	}
 
-	// Create chat service (nil for fileRepo and fileMetadataRepo in basic tests)
+	// Create chat service (nil for discoveryService, fileRepo and fileMetadataRepo in basic tests)
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	// Collect chunks
 	var chunks []string
@@ -153,7 +153,7 @@ func TestChatService_ProcessMessage_WithContext(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	// Process a new message
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Second message", func(string) {})
@@ -213,7 +213,7 @@ func TestChatService_ProcessMessage_ContextLimit(t *testing.T) {
 	// Set limit to 10
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 10,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "New message", func(string) {})
 	if err != nil {
@@ -242,7 +242,7 @@ func TestChatService_ProcessMessage_ProjectNotFound(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	ctx := context.Background()
 	nonExistentID := uuid.New()
@@ -285,7 +285,7 @@ func TestChatService_ProcessMessage_CodeBlockExtraction(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	result, err := chatService.ProcessMessage(ctx, project.ID, "Show me code", func(string) {})
 	if err != nil {
@@ -329,7 +329,7 @@ func TestChatService_ProcessMessage_Timeout(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, nil, nil, logger)
+	}, claudeService, nil, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
 	if err == nil {
@@ -403,7 +403,7 @@ h1 { color: blue; }
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, fileRepo, fileMetadataRepo, logger)
+	}, claudeService, nil, repo, fileRepo, fileMetadataRepo, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a homepage", func(string) {})
 	if err != nil {
@@ -501,7 +501,7 @@ console.log('Hello World');
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, repo, fileRepo, fileMetadataRepo, logger)
+	}, claudeService, nil, repo, fileRepo, fileMetadataRepo, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a script", func(string) {})
 	if err != nil {
@@ -524,5 +524,257 @@ console.log('Hello World');
 	_, err = fileMetadataRepo.GetByFileID(ctx, jsFile.ID)
 	if err != repository.ErrNotFound {
 		t.Errorf("expected ErrNotFound for file without metadata, got: %v", err)
+	}
+}
+
+func TestChatService_ProcessMessage_DiscoveryMode(t *testing.T) {
+	// Track the system prompt sent to Claude
+	var sentSystemPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req claudeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+		sentSystemPrompt = req.System
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		// Response with discovery metadata
+		responseContent := `Welcome! I'm here to help you turn your idea into a working application. First, tell me a bit about yourself - what do you do?<!--DISCOVERY_DATA:{"stage_complete":false,"extracted":{}}-->`
+
+		escaped := strings.ReplaceAll(responseContent, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"` + escaped + `"}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	projectRepo := repository.NewMockProjectRepository()
+	discoveryRepo := repository.NewMockDiscoveryRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+
+	ctx := context.Background()
+	project, _ := projectRepo.Create(ctx, "Test Project")
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+
+	result, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify discovery system prompt was used (should contain "Product Guide")
+	if !strings.Contains(sentSystemPrompt, "Product Guide") {
+		t.Error("expected discovery system prompt to be used")
+	}
+
+	// Verify metadata was stripped from response
+	if strings.Contains(result.Content, "DISCOVERY_DATA") {
+		t.Error("expected discovery metadata to be stripped from response")
+	}
+
+	// Verify the clean response content
+	expectedContent := "Welcome! I'm here to help you turn your idea into a working application. First, tell me a bit about yourself - what do you do?"
+	if result.Content != expectedContent {
+		t.Errorf("expected content '%s', got '%s'", expectedContent, result.Content)
+	}
+}
+
+func TestChatService_ProcessMessage_DiscoveryModeAdvancesStage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		// Response with stage_complete:true and extracted data
+		responseContent := `Great! Running a bakery sounds wonderful. What's your biggest challenge?<!--DISCOVERY_DATA:{"stage_complete":true,"extracted":{"business_context":"Runs a local bakery"}}-->`
+
+		escaped := strings.ReplaceAll(responseContent, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"` + escaped + `"}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	projectRepo := repository.NewMockProjectRepository()
+	discoveryRepo := repository.NewMockDiscoveryRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+
+	ctx := context.Background()
+	project, _ := projectRepo.Create(ctx, "Test Project")
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+
+	// Process message - should create discovery in welcome stage and advance to problem stage
+	_, err := chatService.ProcessMessage(ctx, project.ID, "I run a bakery", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify discovery was created and stage advanced
+	discovery, err := discoveryRepo.GetByProjectID(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("failed to get discovery: %v", err)
+	}
+
+	// Stage should have advanced from welcome to problem
+	if discovery.Stage != model.StageProblem {
+		t.Errorf("expected stage '%s', got '%s'", model.StageProblem, discovery.Stage)
+	}
+
+	// Verify business context was extracted
+	if discovery.BusinessContext == nil || *discovery.BusinessContext != "Runs a local bakery" {
+		t.Errorf("expected business context 'Runs a local bakery', got '%v'", discovery.BusinessContext)
+	}
+}
+
+func TestChatService_ProcessMessage_WithoutDiscoveryService(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req claudeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+
+		// Verify default system prompt is used (should contain "Go Chat" and "FILE FORMAT REQUIREMENT")
+		if !strings.Contains(req.System, "FILE FORMAT REQUIREMENT") {
+			t.Error("expected default system prompt with file format requirements")
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello!"}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	projectRepo := repository.NewMockProjectRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	ctx := context.Background()
+	project, _ := projectRepo.Create(ctx, "Test Project")
+
+	// Create chat service WITHOUT discovery service (nil)
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, nil, projectRepo, nil, nil, logger)
+
+	result, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	if result.Content != "Hello!" {
+		t.Errorf("expected content 'Hello!', got '%s'", result.Content)
+	}
+}
+
+func TestChatService_ProcessMessage_DiscoveryCompleteUsesDefaultPrompt(t *testing.T) {
+	var sentSystemPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req claudeRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+		sentSystemPrompt = req.System
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Here is your code..."}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	projectRepo := repository.NewMockProjectRepository()
+	discoveryRepo := repository.NewMockDiscoveryRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+
+	ctx := context.Background()
+	project, _ := projectRepo.Create(ctx, "Test Project")
+
+	// Create a discovery and mark it complete
+	discovery, _ := discoveryRepo.Create(ctx, project.ID)
+	discoveryRepo.MarkComplete(ctx, discovery.ID)
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+
+	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a homepage", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify default system prompt was used (should contain file format requirements, not Product Guide)
+	if strings.Contains(sentSystemPrompt, "Product Guide") {
+		t.Error("expected default system prompt after discovery complete, got discovery prompt")
+	}
+	if !strings.Contains(sentSystemPrompt, "FILE FORMAT REQUIREMENT") {
+		t.Error("expected default system prompt with FILE FORMAT REQUIREMENT")
 	}
 }

@@ -1,3 +1,6 @@
+// Discovery types
+export * from './discovery';
+
 // Project types
 export interface Project {
   id: string;

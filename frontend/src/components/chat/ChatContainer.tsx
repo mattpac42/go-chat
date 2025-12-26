@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@/hooks/useChat';
+import { useDiscovery } from '@/hooks/useDiscovery';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
+import { DiscoveryProgress, DiscoveryStageDrawer, DiscoverySummaryCard } from '@/components/discovery';
 import { Message } from '@/types';
 
 interface ChatContainerProps {
@@ -36,6 +38,19 @@ export function ChatContainer({
     initialMessages,
   });
 
+  // Discovery integration
+  const {
+    isDiscoveryMode,
+    currentStage,
+    summary,
+    confirmDiscovery,
+    resetDiscovery,
+    refetch: refetchDiscovery,
+  } = useDiscovery(projectId);
+  const [showStageDrawer, setShowStageDrawer] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+
   // Track previous loading state to detect when streaming completes
   const wasLoadingRef = useRef(false);
 
@@ -43,9 +58,60 @@ export function ChatContainer({
     // Detect transition from loading to not loading (streaming complete)
     if (wasLoadingRef.current && !isLoading) {
       onStreamingComplete?.();
+      // Refetch discovery state after each response to update progress
+      refetchDiscovery();
     }
     wasLoadingRef.current = isLoading;
-  }, [isLoading, onStreamingComplete]);
+  }, [isLoading, onStreamingComplete, refetchDiscovery]);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Discovery summary handlers
+  const handleConfirmDiscovery = async () => {
+    setIsConfirming(true);
+    try {
+      await confirmDiscovery();
+    } catch {
+      // Error is handled in the hook
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleEditDiscovery = () => {
+    resetDiscovery();
+  };
+
+  // Check if we should show the summary card
+  const showSummaryCard = currentStage === 'summary' && summary !== null;
+
+  // Stage-aware input placeholder
+  const getPlaceholder = () => {
+    if (connectionStatus !== 'connected') return 'Connecting...';
+    if (isLoading) return 'Waiting for response...';
+    if (!isDiscoveryMode) return 'Describe what you want to build...';
+
+    switch (currentStage) {
+      case 'welcome':
+        return 'Tell me about yourself...';
+      case 'problem':
+        return 'What challenges do you face?';
+      case 'personas':
+        return 'Who will use this?';
+      case 'mvp':
+        return 'What features are essential?';
+      case 'summary':
+        return 'Ready to start building?';
+      default:
+        return 'Describe what you want to build...';
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -65,11 +131,20 @@ export function ChatContainer({
             {projectTitle}
           </h1>
         </div>
-        <ConnectionStatus
-          status={connectionStatus}
-          reconnectAttempts={reconnectAttempts}
-          onReconnect={reconnect}
-        />
+        <div className="flex items-center gap-4">
+          {isDiscoveryMode && (
+            <DiscoveryProgress
+              currentStage={currentStage}
+              onStageClick={() => setShowStageDrawer(true)}
+              isMobile={isMobile}
+            />
+          )}
+          <ConnectionStatus
+            status={connectionStatus}
+            reconnectAttempts={reconnectAttempts}
+            onReconnect={reconnect}
+          />
+        </div>
       </header>
 
       {/* Error banner */}
@@ -88,21 +163,31 @@ export function ChatContainer({
       {/* Messages */}
       <MessageList messages={messages} isLoading={isLoading} />
 
+      {/* Discovery Summary Card - shown when discovery reaches summary stage */}
+      {showSummaryCard && (
+        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+          <DiscoverySummaryCard
+            summary={summary}
+            onEdit={handleEditDiscovery}
+            onConfirm={handleConfirmDiscovery}
+            isConfirming={isConfirming}
+          />
+        </div>
+      )}
+
       {/* Input */}
       <ChatInput
         onSend={sendMessage}
         disabled={connectionStatus !== 'connected' || isLoading}
-        placeholder={
-          connectionStatus !== 'connected'
-            ? 'Connecting...'
-            : isLoading
-            ? 'Waiting for response...'
-            : 'Describe what you want to build...'
-        }
+        placeholder={getPlaceholder()}
       />
 
-      {/* Bottom spacer for visual breathing room */}
-      <div className="h-6 bg-gray-50 flex-shrink-0" />
+      {/* Discovery stage drawer for mobile */}
+      <DiscoveryStageDrawer
+        isOpen={showStageDrawer}
+        onClose={() => setShowStageDrawer(false)}
+        currentStage={currentStage}
+      />
     </div>
   );
 }
