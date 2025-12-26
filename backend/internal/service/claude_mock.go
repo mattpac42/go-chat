@@ -211,7 +211,16 @@ func (m *MockClaudeService) SendMessage(ctx context.Context, systemPrompt string
 		m.currentStage = DiscoveryStage(fixture.Metadata.NextStage)
 	}
 
-	return m.createMockStream(fixture.Response), nil
+	// Build response with metadata comment (mimics real Claude response format)
+	response := fixture.Response
+	if fixture.Metadata.StageComplete || len(fixture.Metadata.Extracted) > 0 {
+		metadataJSON, err := json.Marshal(fixture.Metadata)
+		if err == nil {
+			response = response + "\n\n<!--DISCOVERY_DATA:" + string(metadataJSON) + "-->"
+		}
+	}
+
+	return m.createMockStream(response), nil
 }
 
 // determineFixtureKey determines which fixture to use based on context.

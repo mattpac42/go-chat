@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gitlab.yuki.lan/goodies/gochat/backend/internal/model"
 )
 
 func TestMockDiscoveryRepository_Create(t *testing.T) {
@@ -21,20 +22,17 @@ func TestMockDiscoveryRepository_Create(t *testing.T) {
 	if state.ProjectID != projectID {
 		t.Errorf("expected project ID %s, got %s", projectID, state.ProjectID)
 	}
-	if state.Stage != DiscoveryStageWelcome {
+	if state.Stage != model.StageWelcome {
 		t.Errorf("expected initial stage to be welcome, got %s", state.Stage)
 	}
 	if state.ID == uuid.Nil {
 		t.Error("expected state ID to be generated")
 	}
 
-	// Creating again should return the same state
-	state2, err := repo.Create(ctx, projectID)
-	if err != nil {
-		t.Fatalf("failed to create discovery state again: %v", err)
-	}
-	if state2.ID != state.ID {
-		t.Error("expected same state to be returned for same project")
+	// Creating again should return an error
+	_, err = repo.Create(ctx, projectID)
+	if err == nil {
+		t.Error("expected error when creating discovery for same project")
 	}
 }
 
@@ -85,13 +83,13 @@ func TestMockDiscoveryRepository_UpdateStage(t *testing.T) {
 
 	state, _ := repo.Create(ctx, projectID)
 
-	err := repo.UpdateStage(ctx, state.ID, DiscoveryStageProblem)
+	err := repo.UpdateStage(ctx, state.ID, model.StageProblem)
 	if err != nil {
 		t.Fatalf("failed to update stage: %v", err)
 	}
 
 	updated, _ := repo.GetByID(ctx, state.ID)
-	if updated.Stage != DiscoveryStageProblem {
+	if updated.Stage != model.StageProblem {
 		t.Errorf("expected stage problem, got %s", updated.Stage)
 	}
 }
@@ -203,7 +201,7 @@ func TestMockDiscoveryRepository_AddEdit(t *testing.T) {
 
 	state, _ := repo.Create(ctx, projectID)
 	edit := DiscoveryEdit{
-		Stage:         DiscoveryStageMVP,
+		Stage:         model.StageMVP,
 		OriginalValue: "3 features",
 		NewValue:      "4 features",
 	}
@@ -241,7 +239,7 @@ func TestMockDiscoveryRepository_MarkComplete(t *testing.T) {
 	}
 
 	updated, _ := repo.GetByID(ctx, state.ID)
-	if updated.Stage != DiscoveryStageComplete {
+	if updated.Stage != model.StageComplete {
 		t.Errorf("expected stage complete, got %s", updated.Stage)
 	}
 	if updated.Summary.ConfirmedAt.IsZero() {

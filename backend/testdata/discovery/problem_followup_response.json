@@ -2,7 +2,7 @@
   "stage": "problem",
   "response": "So order tracking is the core problem. Paper and WhatsApp aren't working at scale.\n\nWhat would a perfect day look like if this problem was solved? What would you be able to do that you can't do now?",
   "metadata": {
-    "stage_complete": false,
+    "stage_complete": true,
     "next_stage": "personas",
     "extracted": {
       "business_context": "Custom cake bakery that does custom cake orders",

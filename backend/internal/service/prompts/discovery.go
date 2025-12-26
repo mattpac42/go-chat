@@ -230,11 +230,16 @@ func (b *DiscoveryPromptBuilder) summaryPrompt(ctx *DiscoveryContext) string {
 CURRENT STAGE: Summary (5 of 5)
 %s
 YOUR TASK:
-1. Generate a concise project name based on the context (if not already set)
+1. Generate a SHORT project name (1-3 words, like "Cake Orders" or "Task Tracker")
 2. Create a "solves statement" - one sentence about what problem this solves
 3. Present a complete summary of everything captured
 4. Ask for confirmation: "Does this capture what you need?"
 5. Offer option to edit or start building
+
+PROJECT NAME RULES:
+- Must be 1-3 words
+- Should describe what the app does, not the user's business
+- Examples: "Order Tracker", "Inventory Manager", "Client Portal"
 
 SUMMARY DATA TO PRESENT:
 - Project Name: %s (or generate one if empty)

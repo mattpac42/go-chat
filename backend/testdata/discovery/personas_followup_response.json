@@ -2,7 +2,7 @@
   "stage": "personas",
   "response": "So three people total:\n\n* You (the owner/baker)\n* Two employees who take orders\n\nShould your employees be able to do everything, or are there some things only you should handle - like seeing sales numbers or changing prices?",
   "metadata": {
-    "stage_complete": false,
+    "stage_complete": true,
     "next_stage": "mvp",
     "extracted": {
       "business_context": "Custom cake bakery that does custom cake orders",

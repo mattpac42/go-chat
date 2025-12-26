@@ -55,15 +55,25 @@ func main() {
 	fileMetadataRepo := repository.NewPostgresFileMetadataRepository(db)
 	discoveryRepo := repository.NewPostgresDiscoveryRepository(db)
 
-	// Initialize Claude service
-	claudeService := service.NewClaudeService(service.ClaudeConfig{
-		APIKey:    cfg.ClaudeAPIKey,
-		Model:     cfg.ClaudeModel,
-		MaxTokens: cfg.ClaudeMaxTokens,
-	}, logger)
+	// Initialize Claude service (real or mock)
+	var claudeService service.ClaudeMessenger
+	if os.Getenv("USE_MOCK_CLAUDE") == "true" {
+		mockService, err := service.NewMockClaudeService("testdata/discovery")
+		if err != nil {
+			logger.Fatal().Err(err).Msg("failed to load mock fixtures")
+		}
+		claudeService = mockService
+		logger.Info().Msg("using MOCK Claude service (no API calls)")
+	} else {
+		claudeService = service.NewClaudeService(service.ClaudeConfig{
+			APIKey:    cfg.ClaudeAPIKey,
+			Model:     cfg.ClaudeModel,
+			MaxTokens: cfg.ClaudeMaxTokens,
+		}, logger)
+	}
 
 	// Initialize discovery service
-	discoveryService := service.NewDiscoveryService(discoveryRepo, logger)
+	discoveryService := service.NewDiscoveryService(discoveryRepo, projectRepo, logger)
 
 	// Initialize chat service
 	chatService := service.NewChatService(service.ChatConfig{

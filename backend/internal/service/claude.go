@@ -14,6 +14,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ClaudeMessenger is the interface for sending messages to Claude (real or mock).
+type ClaudeMessenger interface {
+	SendMessage(ctx context.Context, systemPrompt string, messages []ClaudeMessage) (*ClaudeStream, error)
+}
+
 const (
 	defaultBaseURL      = "https://api.anthropic.com/v1/messages"
 	anthropicVersion    = "2023-06-01"

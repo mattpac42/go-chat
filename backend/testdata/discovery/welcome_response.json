@@ -2,7 +2,7 @@
   "stage": "welcome",
   "response": "Welcome! I'm here to help you turn your idea into a working application.\n\nBefore we start building, let's take a few minutes to understand exactly what you need. This will help us create something that truly fits your business.\n\nFirst, tell me a bit about yourself - what do you do?",
   "metadata": {
-    "stage_complete": false,
+    "stage_complete": true,
     "next_stage": "problem",
     "extracted": {}
   }

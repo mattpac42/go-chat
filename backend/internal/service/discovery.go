@@ -17,14 +17,16 @@ import (
 // DiscoveryService orchestrates the discovery flow.
 type DiscoveryService struct {
 	repo          repository.DiscoveryRepository
+	projectRepo   repository.ProjectRepository
 	promptBuilder *prompts.DiscoveryPromptBuilder
 	logger        zerolog.Logger
 }
 
 // NewDiscoveryService creates a new DiscoveryService.
-func NewDiscoveryService(repo repository.DiscoveryRepository, logger zerolog.Logger) *DiscoveryService {
+func NewDiscoveryService(repo repository.DiscoveryRepository, projectRepo repository.ProjectRepository, logger zerolog.Logger) *DiscoveryService {
 	return &DiscoveryService{
 		repo:          repo,
+		projectRepo:   projectRepo,
 		promptBuilder: prompts.NewDiscoveryPromptBuilder(),
 		logger:        logger,
 	}
@@ -393,10 +395,47 @@ func (s *DiscoveryService) ExtractAndSaveData(ctx context.Context, discoveryID u
 				Str("discoveryId", discoveryID.String()).
 				Str("newStage", string(nextStage)).
 				Msg("advanced discovery stage based on metadata")
+
+			// When discovery completes, rename the project using discovered name
+			if nextStage == model.StageComplete && s.projectRepo != nil {
+				s.renameProjectFromDiscovery(ctx, discovery)
+			}
 		}
 	}
 
 	return nil
+}
+
+// renameProjectFromDiscovery renames the project using the name discovered during the flow.
+func (s *DiscoveryService) renameProjectFromDiscovery(ctx context.Context, discovery *model.ProjectDiscovery) {
+	// Refresh discovery to get latest project_name
+	updatedDiscovery, err := s.repo.GetByID(ctx, discovery.ID)
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("failed to get discovery for project rename")
+		return
+	}
+
+	if updatedDiscovery.ProjectName == nil || *updatedDiscovery.ProjectName == "" {
+		s.logger.Debug().Msg("no project name in discovery, skipping rename")
+		return
+	}
+
+	projectName := *updatedDiscovery.ProjectName
+
+	// Update the project title
+	if err := s.projectRepo.Update(ctx, discovery.ProjectID, projectName); err != nil {
+		s.logger.Warn().
+			Err(err).
+			Str("projectId", discovery.ProjectID.String()).
+			Str("newName", projectName).
+			Msg("failed to rename project after discovery")
+		return
+	}
+
+	s.logger.Info().
+		Str("projectId", discovery.ProjectID.String()).
+		Str("newName", projectName).
+		Msg("renamed project after discovery complete")
 }
 
 // parseResponseMetadata extracts the metadata JSON from Claude's response.
@@ -455,16 +494,26 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 		}
 	}
 
-	// Extract project name
+	// Extract project name (check top-level and nested under "summary")
 	if pn, ok := extracted["project_name"].(string); ok && pn != "" {
 		update.ProjectName = &pn
 		hasUpdates = true
+	} else if summary, ok := extracted["summary"].(map[string]interface{}); ok {
+		if pn, ok := summary["project_name"].(string); ok && pn != "" {
+			update.ProjectName = &pn
+			hasUpdates = true
+		}
 	}
 
-	// Extract solves statement
+	// Extract solves statement (check top-level and nested under "summary")
 	if ss, ok := extracted["solves_statement"].(string); ok && ss != "" {
 		update.SolvesStatement = &ss
 		hasUpdates = true
+	} else if summary, ok := extracted["summary"].(map[string]interface{}); ok {
+		if ss, ok := summary["solves_statement"].(string); ok && ss != "" {
+			update.SolvesStatement = &ss
+			hasUpdates = true
+		}
 	}
 
 	// Update discovery data

@@ -52,7 +52,7 @@ export function ChatInput({
   }, []);
 
   return (
-    <div className="flex items-end gap-2 p-4 border-t border-gray-200 bg-white safe-area-pb">
+    <div className="flex items-end gap-2 p-4 pb-5 border-t border-gray-200 bg-white safe-area-pb">
       <textarea
         ref={textareaRef}
         value={message}
@@ -61,7 +61,7 @@ export function ChatInput({
         disabled={disabled}
         placeholder={placeholder}
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed min-h-[48px] max-h-[120px]"
+        className="flex-1 resize-none rounded-xl border-2 border-gray-300 px-4 py-3 text-base focus:outline-none focus:border-teal-400 disabled:bg-gray-100 disabled:cursor-not-allowed min-h-[48px] max-h-[120px]"
         aria-label="Message input"
         data-testid="chat-input"
       />

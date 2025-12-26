@@ -25,7 +25,7 @@ type ChatConfig struct {
 // ChatService orchestrates chat interactions between WebSocket, Claude, and database.
 type ChatService struct {
 	config           ChatConfig
-	claudeService    *ClaudeService
+	claudeService    ClaudeMessenger
 	discoveryService *DiscoveryService
 	repo             repository.ProjectRepository
 	fileRepo         repository.FileRepository
@@ -36,7 +36,7 @@ type ChatService struct {
 // NewChatService creates a new chat service.
 func NewChatService(
 	config ChatConfig,
-	claudeService *ClaudeService,
+	claudeService ClaudeMessenger,
 	discoveryService *DiscoveryService,
 	repo repository.ProjectRepository,
 	fileRepo repository.FileRepository,
