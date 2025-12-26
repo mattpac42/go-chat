@@ -26,6 +26,7 @@ type ChatConfig struct {
 type ChatService struct {
 	config           ChatConfig
 	claudeService    *ClaudeService
+	discoveryService *DiscoveryService
 	repo             repository.ProjectRepository
 	fileRepo         repository.FileRepository
 	fileMetadataRepo repository.FileMetadataRepository
@@ -36,6 +37,7 @@ type ChatService struct {
 func NewChatService(
 	config ChatConfig,
 	claudeService *ClaudeService,
+	discoveryService *DiscoveryService,
 	repo repository.ProjectRepository,
 	fileRepo repository.FileRepository,
 	fileMetadataRepo repository.FileMetadataRepository,
@@ -47,6 +49,7 @@ func NewChatService(
 	return &ChatService{
 		config:           config,
 		claudeService:    claudeService,
+		discoveryService: discoveryService,
 		repo:             repo,
 		fileRepo:         fileRepo,
 		fileMetadataRepo: fileMetadataRepo,
@@ -77,6 +80,19 @@ func (s *ChatService) ProcessMessage(
 		return nil, fmt.Errorf("failed to get project: %w", err)
 	}
 
+	// Get or create discovery state for the project (if discovery service is configured)
+	var discovery *model.ProjectDiscovery
+	if s.discoveryService != nil {
+		discovery, err = s.discoveryService.GetOrCreateDiscovery(ctx, projectID)
+		if err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Msg("failed to get discovery state, falling back to default mode")
+			// Continue without discovery mode - don't fail the message
+		}
+	}
+
 	// Save user message first
 	_, err = s.repo.CreateMessage(ctx, projectID, model.RoleUser, content)
 	if err != nil {
@@ -92,13 +108,17 @@ func (s *ChatService) ProcessMessage(
 	// Convert to Claude messages format with limit
 	claudeMessages := s.buildClaudeMessages(messages)
 
+	// Get appropriate system prompt (discovery-aware or default)
+	systemPrompt := s.getSystemPrompt(ctx, projectID, discovery)
+
 	s.logger.Debug().
 		Str("projectId", projectID.String()).
 		Int("contextMessages", len(claudeMessages)).
+		Bool("discoveryMode", discovery != nil && !discovery.Stage.IsComplete()).
 		Msg("sending message to Claude")
 
 	// Send to Claude
-	stream, err := s.claudeService.SendMessage(ctx, DefaultSystemPrompt(), claudeMessages)
+	stream, err := s.claudeService.SendMessage(ctx, systemPrompt, claudeMessages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send message to Claude: %w", err)
 	}
@@ -118,6 +138,21 @@ func (s *ChatService) ProcessMessage(
 	}
 
 	responseContent := fullResponse.String()
+
+	// If in discovery mode, extract and save discovery data from response
+	if discovery != nil && !discovery.Stage.IsComplete() {
+		if err := s.discoveryService.ExtractAndSaveData(ctx, discovery.ID, responseContent); err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Str("discoveryId", discovery.ID.String()).
+				Msg("failed to extract discovery data from response")
+			// Continue - don't fail the message for discovery extraction errors
+		}
+
+		// Strip discovery metadata from response for display
+		responseContent = StripMetadata(responseContent)
+	}
 
 	// Extract code blocks with metadata from response
 	markdownBlocks := markdown.ExtractCodeBlocksWithMetadata(responseContent)
@@ -233,6 +268,31 @@ func (s *ChatService) buildClaudeMessages(messages []model.Message) []ClaudeMess
 	}
 
 	return claudeMessages
+}
+
+// getSystemPrompt returns the appropriate system prompt based on discovery state.
+// If the project is in discovery mode, returns the stage-specific discovery prompt.
+// Otherwise, returns the default code-generation prompt.
+func (s *ChatService) getSystemPrompt(ctx context.Context, projectID uuid.UUID, discovery *model.ProjectDiscovery) string {
+	// If discovery service is configured and project is in discovery mode
+	if s.discoveryService != nil && discovery != nil && !discovery.Stage.IsComplete() {
+		prompt, err := s.discoveryService.GetSystemPrompt(ctx, projectID)
+		if err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Msg("failed to get discovery prompt, using default")
+		} else if prompt != "" {
+			s.logger.Debug().
+				Str("projectId", projectID.String()).
+				Str("stage", string(discovery.Stage)).
+				Msg("using discovery system prompt")
+			return prompt
+		}
+	}
+
+	// Fall back to default prompt
+	return DefaultSystemPrompt()
 }
 
 // inferFilenamesFromUserMessageWithMetadata extracts filenames mentioned in the user's message

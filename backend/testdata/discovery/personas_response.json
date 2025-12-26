@@ -1,0 +1,13 @@
+{
+  "stage": "personas",
+  "response": "Great - so we're building an order management system.\n\nNow let's think about who will actually use this. Besides yourself, who else needs access?",
+  "metadata": {
+    "stage_complete": false,
+    "next_stage": "mvp",
+    "extracted": {
+      "business_context": "Custom cake bakery that does custom cake orders",
+      "problem_statement": "Order tracking is chaos - uses paper and WhatsApp, things get lost",
+      "goals": ["See all orders in one place", "Track order status", "Know delivery schedules"]
+    }
+  }
+}
