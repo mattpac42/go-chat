@@ -112,13 +112,14 @@ func (s *ChatService) ProcessMessage(
 	// Convert to Claude messages format with limit
 	claudeMessages := s.buildClaudeMessages(messages)
 
-	// Get appropriate system prompt (discovery-aware or default)
-	systemPrompt := s.getSystemPrompt(ctx, projectID, discovery)
-
-	// Determine agent type for this message (only when not in discovery mode)
+	// Determine agent context and system prompt
 	var agentType *string
+	var agentContext *model.AgentContext
+
+	// Get agent context (only when not in discovery mode)
 	if s.agentContextService != nil && (discovery == nil || discovery.Stage.IsComplete()) {
-		agentContext, err := s.agentContextService.GetContextForMessage(ctx, projectID, content)
+		var err error
+		agentContext, err = s.agentContextService.GetContextForMessage(ctx, projectID, content)
 		if err != nil {
 			s.logger.Warn().
 				Err(err).
@@ -133,6 +134,9 @@ func (s *ChatService) ProcessMessage(
 				Msg("determined agent type for message")
 		}
 	}
+
+	// Get appropriate system prompt (discovery-aware, agent-specific, or default)
+	systemPrompt := s.getSystemPrompt(ctx, projectID, discovery, agentContext)
 
 	s.logger.Debug().
 		Str("projectId", projectID.String()).
@@ -294,10 +298,11 @@ func (s *ChatService) buildClaudeMessages(messages []model.Message) []ClaudeMess
 	return claudeMessages
 }
 
-// getSystemPrompt returns the appropriate system prompt based on discovery state.
-// If the project is in discovery mode, returns the stage-specific discovery prompt.
-// Otherwise, returns the default code-generation prompt.
-func (s *ChatService) getSystemPrompt(ctx context.Context, projectID uuid.UUID, discovery *model.ProjectDiscovery) string {
+// getSystemPrompt returns the appropriate system prompt based on state.
+// Priority: 1) Discovery prompt (if in discovery mode)
+//           2) Agent-specific prompt (if agent context available)
+//           3) Default code-generation prompt
+func (s *ChatService) getSystemPrompt(ctx context.Context, projectID uuid.UUID, discovery *model.ProjectDiscovery, agentContext *model.AgentContext) string {
 	// If discovery service is configured and project is in discovery mode
 	if s.discoveryService != nil && discovery != nil && !discovery.Stage.IsComplete() {
 		prompt, err := s.discoveryService.GetSystemPrompt(ctx, projectID)
@@ -311,6 +316,24 @@ func (s *ChatService) getSystemPrompt(ctx context.Context, projectID uuid.UUID, 
 				Str("projectId", projectID.String()).
 				Str("stage", string(discovery.Stage)).
 				Msg("using discovery system prompt")
+			return prompt
+		}
+	}
+
+	// If agent context is available, use agent-specific prompt
+	if agentContext != nil && s.agentContextService != nil {
+		prompt, err := s.agentContextService.GetSystemPrompt(ctx, agentContext)
+		if err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Str("agent", string(agentContext.Agent)).
+				Msg("failed to get agent prompt, using default")
+		} else if prompt != "" {
+			s.logger.Debug().
+				Str("projectId", projectID.String()).
+				Str("agent", string(agentContext.Agent)).
+				Msg("using agent-specific system prompt")
 			return prompt
 		}
 	}
