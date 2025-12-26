@@ -157,16 +157,16 @@ export function FileExplorer({
       {showViewToggle && (
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100">
           <button
-            onClick={() => setViewMode('tree')}
+            onClick={() => setViewMode('grouped')}
             className={`p-1.5 rounded transition-colors ${
-              viewMode === 'tree'
+              viewMode === 'grouped'
                 ? 'bg-teal-100 text-teal-700'
                 : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
             }`}
-            title="Tree view"
-            aria-label="Tree view"
+            title="Group by function"
+            aria-label="Group by function"
           >
-            <TreeViewIcon className="w-4 h-4" />
+            <GroupViewIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('reveal')}
@@ -181,22 +181,22 @@ export function FileExplorer({
             <CardViewIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={() => setViewMode('grouped')}
+            onClick={() => setViewMode('tree')}
             className={`p-1.5 rounded transition-colors ${
-              viewMode === 'grouped'
+              viewMode === 'tree'
                 ? 'bg-teal-100 text-teal-700'
                 : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
             }`}
-            title="Group by function"
-            aria-label="Group by function"
+            title="Tree view"
+            aria-label="Tree view"
           >
-            <GroupViewIcon className="w-4 h-4" />
+            <TreeViewIcon className="w-4 h-4" />
           </button>
 
           <span className="ml-auto text-xs text-gray-400">
-            {viewMode === 'tree' && 'Files'}
-            {viewMode === 'reveal' && 'Descriptions'}
             {viewMode === 'grouped' && 'By Purpose'}
+            {viewMode === 'reveal' && 'Descriptions'}
+            {viewMode === 'tree' && 'Files'}
           </span>
         </div>
       )}

@@ -102,8 +102,8 @@ function processAssistantContent(content: string, showCode: boolean): string {
     fileType = 'functionality';
   }
 
-  // Create a friendly summary
-  const fileList = uniqueFilenames.join(', ');
+  // Create a friendly summary with filenames as inline code
+  const fileList = uniqueFilenames.map(f => `\`${f}\``).join(', ');
   const summary = `\n\n📁 **Created ${uniqueFilenames.length} ${uniqueFilenames.length === 1 ? 'file' : 'files'}:** ${fileList}\n\n_Check the Files panel to see what each file does →_`;
 
   // If there's other content, keep it and append summary
@@ -227,6 +227,20 @@ export function MessageBubble({ message, showCodeBlocks = false }: MessageBubble
                       }
                       // Strip any backticks from inline code content
                       const cleanContent = textContent.replace(/`/g, '');
+
+                      // If content has newlines, render as a block-level code element
+                      const hasNewlines = cleanContent.includes('\n');
+                      if (hasNewlines) {
+                        return (
+                          <code
+                            className={`block ${isUser ? 'bg-teal-500/50' : 'bg-gray-200'} px-3 py-2 rounded text-sm font-mono whitespace-pre my-2`}
+                            {...props}
+                          >
+                            {cleanContent}
+                          </code>
+                        );
+                      }
+
                       return (
                         <code
                           className={`${isUser ? 'bg-teal-500/50' : 'bg-gray-200'} px-1.5 py-0.5 rounded text-sm`}

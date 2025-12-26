@@ -50,11 +50,14 @@ type ListFilesWithMetadataResponse struct {
 
 // GetFileResponse represents the response for getting a single file.
 type GetFileResponse struct {
-	ID        uuid.UUID `json:"id"`
-	ProjectID uuid.UUID `json:"projectId"`
-	Path      string    `json:"path"`
-	Filename  string    `json:"filename"`
-	Language  string    `json:"language,omitempty"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID               uuid.UUID `json:"id"`
+	ProjectID        uuid.UUID `json:"projectId"`
+	Path             string    `json:"path"`
+	Filename         string    `json:"filename"`
+	Language         string    `json:"language,omitempty"`
+	Content          string    `json:"content"`
+	ShortDescription string    `json:"shortDescription,omitempty"`
+	LongDescription  string    `json:"longDescription,omitempty"`
+	FunctionalGroup  string    `json:"functionalGroup,omitempty"`
+	CreatedAt        time.Time `json:"createdAt"`
 }

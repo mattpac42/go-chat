@@ -15,6 +15,7 @@ import (
 type FileRepository interface {
 	SaveFile(ctx context.Context, projectID uuid.UUID, path, language, content string) (*model.File, error)
 	GetFilesByProject(ctx context.Context, projectID uuid.UUID) ([]model.FileListItem, error)
+	GetFilesWithContentByProject(ctx context.Context, projectID uuid.UUID) ([]model.File, error)
 	GetFile(ctx context.Context, id uuid.UUID) (*model.File, error)
 	GetFileByPath(ctx context.Context, projectID uuid.UUID, path string) (*model.File, error)
 }
@@ -62,6 +63,23 @@ func (r *PostgresFileRepository) GetFilesByProject(ctx context.Context, projectI
 	`
 
 	var files []model.FileListItem
+	if err := r.db.SelectContext(ctx, &files, query, projectID); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+// GetFilesWithContentByProject returns all files for a project with content.
+func (r *PostgresFileRepository) GetFilesWithContentByProject(ctx context.Context, projectID uuid.UUID) ([]model.File, error) {
+	query := `
+		SELECT id, project_id, path, filename, language, content, created_at
+		FROM files
+		WHERE project_id = $1
+		ORDER BY path ASC
+	`
+
+	var files []model.File
 	if err := r.db.SelectContext(ctx, &files, query, projectID); err != nil {
 		return nil, err
 	}

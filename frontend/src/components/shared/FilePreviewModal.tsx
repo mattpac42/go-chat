@@ -166,6 +166,11 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
               )}
             </div>
             <div className="flex items-center gap-2">
+              {file.functionalGroup && (
+                <span className="text-xs px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full flex-shrink-0">
+                  {file.functionalGroup}
+                </span>
+              )}
               <button
                 onClick={handleCopy}
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -188,7 +193,7 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
           </div>
 
           {/* Code content */}
-          <div className="overflow-auto p-4 h-[calc(80vh-100px)]">
+          <div className="overflow-auto p-4 h-[calc(80vh-100px)] bg-teal-50">
             <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words">
               {file.content}
             </pre>
@@ -212,14 +217,19 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
         className="absolute top-0 right-0 bottom-0 w-full max-w-2xl bg-white shadow-xl transition-transform duration-300 ease-out flex flex-col"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-gray-900 truncate">{file.path}</h3>
             {file.language && (
               <p className="text-sm text-gray-500">{file.language}</p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {file.functionalGroup && (
+              <span className="text-xs px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full flex-shrink-0">
+                {file.functionalGroup}
+              </span>
+            )}
             <button
               onClick={handleCopy}
               className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 transition-colors"
@@ -247,7 +257,7 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
         </div>
 
         {/* Code content */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div className="flex-1 overflow-auto p-6 bg-teal-50">
           <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
             {file.content}
           </pre>

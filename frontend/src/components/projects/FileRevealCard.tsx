@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FileNode, FileWithContent } from '@/types';
+import { API_BASE_URL } from '@/lib/api';
 
 interface FileRevealCardProps {
   file: FileNode;
@@ -12,6 +13,8 @@ interface FileRevealCardProps {
   onCardClick?: () => void;
   /** Called when user explicitly expands via chevron/code (should "pin" open) */
   onIntentionalExpand?: (tier: RevealTier) => void;
+  /** Hide functional group tag (used in purpose view to avoid redundancy) */
+  hideFunctionalGroup?: boolean;
 }
 
 type RevealTier = 'collapsed' | 'details' | 'code';
@@ -58,6 +61,30 @@ function getLanguageDisplay(filename: string, language?: string): string {
     yml: 'YAML',
   };
   return extMap[ext] || 'File';
+}
+
+/**
+ * Convert full language name to 2-3 letter abbreviation for compact display
+ */
+function getAbbreviatedLanguage(language: string): string {
+  const abbrevMap: Record<string, string> = {
+    'TypeScript': 'TS',
+    'TypeScript React': 'TSX',
+    'JavaScript': 'JS',
+    'JavaScript React': 'JSX',
+    'Go': 'GO',
+    'Python': 'PY',
+    'Rust': 'RS',
+    'JSON': 'JSON',
+    'Markdown': 'MD',
+    'CSS': 'CSS',
+    'SCSS': 'SCSS',
+    'HTML': 'HTML',
+    'SQL': 'SQL',
+    'YAML': 'YAML',
+    'File': '···',
+  };
+  return abbrevMap[language] || language.substring(0, 3).toUpperCase();
 }
 
 /**
@@ -212,6 +239,24 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+      />
+    </svg>
+  );
+}
+
 function LoadingSpinner({ className }: { className?: string }) {
   return (
     <svg
@@ -253,6 +298,7 @@ export function FileRevealCard({
   tier: controlledTier,
   onCardClick,
   onIntentionalExpand,
+  hideFunctionalGroup = false,
 }: FileRevealCardProps) {
   const [internalTier, setInternalTier] = useState<RevealTier>('collapsed');
   const [content, setContent] = useState<string | null>(file.content || null);
@@ -368,47 +414,54 @@ export function FileRevealCard({
       className={`bg-white rounded-lg border-l-4 ${accentColor} shadow-sm hover:shadow-md transition-all duration-200 focus-within:ring-2 focus-within:ring-teal-500 focus-within:ring-offset-1`}
     >
       {/* Tier 1: Header (always visible) - click to show/hide details */}
-      <button
+      <div
         onClick={handleCardClick}
-        className="w-full text-left p-4 focus:outline-none rounded-t-lg"
+        className="w-full text-left p-3 cursor-pointer rounded-t-lg"
+        role="button"
+        tabIndex={0}
         aria-expanded={showDetails}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleCardClick(); }}
       >
-        <div className="flex items-start gap-3">
+        {/* Row 1: Filename + abbreviated language badge */}
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h3 className="font-medium text-gray-900 truncate flex-1 min-w-0">
+            {file.name}
+          </h3>
+          <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 flex-shrink-0 font-mono">
+            {getAbbreviatedLanguage(languageDisplay)}
+          </span>
+        </div>
+
+        {/* Row 2: Icon + description + actions */}
+        <div className="flex items-center gap-2">
           <FileTypeIcon filename={file.name} language={file.language} />
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-medium text-gray-900 truncate">
-                {file.name}
-              </h3>
-              <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-500 flex-shrink-0">
-                {languageDisplay}
-              </span>
-            </div>
+          <p className={`flex-1 min-w-0 text-sm text-gray-600 ${showDetails ? '' : 'truncate'}`}>
+            {shortDescription}
+          </p>
 
-            {/* Short description - always visible */}
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {shortDescription}
-            </p>
-
-            {/* Functional group badge if available */}
-            {file.functionalGroup && (
-              <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full">
-                {file.functionalGroup}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Code icon - shortcut to code view */}
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {/* Download icon */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(`${API_BASE_URL}/api/files/${file.id}/download`, '_blank');
+              }}
+              className="p-1 rounded hover:bg-gray-100 transition-colors"
+              aria-label="Download file"
+              title="Download file"
+            >
+              <DownloadIcon className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+            {/* Code icon */}
             <button
               onClick={handleViewCode}
               className="p-1 rounded hover:bg-gray-100 transition-colors"
               aria-label={showCode ? 'Hide code' : 'View code'}
             >
-              <CodeIcon className={`w-4 h-4 ${showCode ? 'text-teal-500' : 'text-gray-400'}`} />
+              <CodeIcon className={`w-3.5 h-3.5 ${showCode ? 'text-teal-500' : 'text-gray-400'}`} />
             </button>
-            {/* Chevron - always visible, cycles through tiers */}
+            {/* Chevron */}
             <button
               onClick={handleChevronClick}
               className="p-1 rounded hover:bg-gray-100 transition-colors"
@@ -418,7 +471,14 @@ export function FileRevealCard({
             </button>
           </div>
         </div>
-      </button>
+
+        {/* Functional group badge if available */}
+        {file.functionalGroup && !hideFunctionalGroup && (
+          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full">
+            {file.functionalGroup}
+          </span>
+        )}
+      </div>
 
       {/* Tier 2: Long Description (stays visible with code for context) */}
       {hasLongDescription && (showDetails || showCode) && (

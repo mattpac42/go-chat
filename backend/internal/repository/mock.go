@@ -232,6 +232,21 @@ func (r *MockFileRepository) GetFilesByProject(ctx context.Context, projectID uu
 	return result, nil
 }
 
+// GetFilesWithContentByProject returns all files for a project with content.
+func (r *MockFileRepository) GetFilesWithContentByProject(ctx context.Context, projectID uuid.UUID) ([]model.File, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []model.File
+	for _, file := range r.files {
+		if file.ProjectID == projectID {
+			result = append(result, *file)
+		}
+	}
+
+	return result, nil
+}
+
 // GetFile returns a file by ID.
 func (r *MockFileRepository) GetFile(ctx context.Context, id uuid.UUID) (*model.File, error) {
 	r.mu.RLock()

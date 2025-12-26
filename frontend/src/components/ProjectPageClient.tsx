@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useProjects, useProject } from '@/hooks/useProjects';
 import { useFiles } from '@/hooks/useFiles';
 import { Project } from '@/types';
+import { API_BASE_URL } from '@/lib/api';
 
 export function ProjectPageClient() {
   const params = useParams();
@@ -109,20 +110,55 @@ export function ProjectPageClient() {
   return (
     <div className="flex h-full">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex md:w-72 md:flex-shrink-0 border-r border-gray-200 bg-white">
+      <aside className="hidden md:flex md:w-72 md:flex-shrink-0 border-r border-gray-200 bg-white flex-col">
         {isLoadingProjects ? (
-          <div className="flex items-center justify-center w-full">
+          <div className="flex items-center justify-center w-full flex-1">
             <LoadingSpinner />
           </div>
         ) : (
-          <ProjectList
-            projects={projects}
-            activeProjectId={projectId}
-            onNewProject={handleNewProject}
-            onProjectSelect={handleProjectSelect}
-            onProjectRename={handleProjectRename}
-            onProjectDelete={handleProjectDelete}
-          />
+          <>
+            <div className="flex-shrink-0">
+              <ProjectList
+                projects={projects}
+                activeProjectId={projectId}
+                onNewProject={handleNewProject}
+                onProjectSelect={handleProjectSelect}
+                onProjectRename={handleProjectRename}
+                onProjectDelete={handleProjectDelete}
+              />
+            </div>
+            {/* Files section - visible on md screens where right panel is hidden */}
+            {fileTree.length > 0 && (
+              <div className="flex-1 flex flex-col border-t border-gray-200 lg:hidden overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
+                    <button
+                      onClick={() => {
+                        window.open(`${API_BASE_URL}/api/projects/${projectId}/download`, '_blank');
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                      title="Download all files as ZIP"
+                      aria-label="Download all files as ZIP"
+                    >
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <FileExplorer
+                    files={fileTree}
+                    onLoadContent={getFile}
+                    defaultViewMode="grouped"
+                    showViewToggle={true}
+                    isLoading={isLoadingFiles}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </aside>
 
@@ -135,20 +171,55 @@ export function ProjectPageClient() {
             onClick={handleCloseSidebar}
           />
           {/* Drawer */}
-          <aside className="fixed inset-y-0 left-0 w-72 bg-white z-50 md:hidden shadow-xl">
+          <aside className="fixed inset-y-0 left-0 w-72 bg-white z-50 md:hidden shadow-xl flex flex-col">
             {isLoadingProjects ? (
               <div className="flex items-center justify-center h-full">
                 <LoadingSpinner />
               </div>
             ) : (
-              <ProjectList
-                projects={projects}
-                activeProjectId={projectId}
-                onNewProject={handleNewProject}
-                onProjectSelect={handleProjectSelect}
-                onProjectRename={handleProjectRename}
-                onProjectDelete={handleProjectDelete}
-              />
+              <>
+                <div className="flex-shrink-0">
+                  <ProjectList
+                    projects={projects}
+                    activeProjectId={projectId}
+                    onNewProject={handleNewProject}
+                    onProjectSelect={handleProjectSelect}
+                    onProjectRename={handleProjectRename}
+                    onProjectDelete={handleProjectDelete}
+                  />
+                </div>
+                {/* Files section for mobile */}
+                {fileTree.length > 0 && (
+                  <div className="flex-1 flex flex-col border-t border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
+                        <button
+                          onClick={() => {
+                            window.open(`${API_BASE_URL}/api/projects/${projectId}/download`, '_blank');
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                          title="Download all files as ZIP"
+                          aria-label="Download all files as ZIP"
+                        >
+                          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <FileExplorer
+                        files={fileTree}
+                        onLoadContent={getFile}
+                        defaultViewMode="grouped"
+                        showViewToggle={true}
+                        isLoading={isLoadingFiles}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </aside>
         </>
@@ -174,7 +245,23 @@ export function ProjectPageClient() {
       {/* Right sidebar - Files with 2-tier reveal system */}
       <aside className="hidden lg:flex lg:w-80 lg:flex-shrink-0 border-l border-gray-200 bg-white flex-col">
         <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
+            {fileTree.length > 0 && (
+              <button
+                onClick={() => {
+                  window.open(`${API_BASE_URL}/api/projects/${projectId}/download`, '_blank');
+                }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Download all files as ZIP"
+                aria-label="Download all files as ZIP"
+              >
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-400 mt-0.5">
             Click to see what each file does
           </p>
@@ -183,7 +270,7 @@ export function ProjectPageClient() {
           <FileExplorer
             files={fileTree}
             onLoadContent={getFile}
-            defaultViewMode="reveal"
+            defaultViewMode="grouped"
             showViewToggle={true}
             isLoading={isLoadingFiles}
           />

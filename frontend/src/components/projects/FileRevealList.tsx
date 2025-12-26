@@ -161,7 +161,7 @@ function FunctionalGroupSection({
   onCardClick,
   onIntentionalExpand,
 }: FunctionalGroupSectionProps) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false); // Collapsed by default
 
   // Color mapping for functional groups
   const groupColors: Record<string, string> = {
@@ -181,7 +181,7 @@ function FunctionalGroupSection({
   const colorClasses = groupColors[groupName] || 'bg-gray-50 text-gray-700 border-gray-200';
 
   return (
-    <div className="mb-4">
+    <div>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center gap-3 px-4 py-3 text-left border rounded-lg transition-colors ${colorClasses}`}
@@ -203,6 +203,7 @@ function FunctionalGroupSection({
               tier={getFileTier(file.id)}
               onCardClick={() => onCardClick(file.id, !!file.longDescription)}
               onIntentionalExpand={(tier) => onIntentionalExpand(file.id, tier)}
+              hideFunctionalGroup={true}
             />
           ))}
         </div>
@@ -375,7 +376,7 @@ export function FileRevealList({
     const groups = groupFilesByFunction(files);
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         {Array.from(groups.entries()).map(([groupName, groupFiles]) => (
           <FunctionalGroupSection
             key={groupName}

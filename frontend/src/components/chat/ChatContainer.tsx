@@ -100,6 +100,9 @@ export function ChatContainer({
             : 'Describe what you want to build...'
         }
       />
+
+      {/* Bottom spacer for visual breathing room */}
+      <div className="h-6 bg-gray-50 flex-shrink-0" />
     </div>
   );
 }
