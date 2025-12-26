@@ -257,8 +257,15 @@ End with: "Does this capture what you need? You can edit any details now, or we 
 
 %s
 
-METADATA FORMAT FOR THIS STAGE:
-<!--DISCOVERY_DATA:{"stage_complete":true,"extracted":{"project_name":"Generated Name","solves_statement":"One sentence about the problem solved"}}-->
+CRITICAL METADATA REQUIREMENT:
+You MUST include this metadata comment at the VERY END of your response:
+<!--DISCOVERY_DATA:{"stage_complete":true,"extracted":{"project_name":"Your Generated Name","solves_statement":"Your one sentence problem statement"}}-->
+
+Replace "Your Generated Name" with the actual project name you generated (1-3 words).
+Replace "Your one sentence problem statement" with the actual solves statement.
+
+Example metadata:
+<!--DISCOVERY_DATA:{"stage_complete":true,"extracted":{"project_name":"Order Tracker","solves_statement":"Replaces manual spreadsheet tracking with an organized digital system"}}-->
 
 Mark stage_complete as true when:
 1. Summary has been presented
