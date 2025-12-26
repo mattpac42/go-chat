@@ -1,6 +1,20 @@
 // Discovery types
 export * from './discovery';
 
+// Agent types for multi-agent chat UI
+export type AgentType = 'product_manager' | 'designer' | 'developer';
+
+export const AGENT_CONFIG: Record<AgentType, {
+  displayName: string;
+  shortName: string;
+  color: string;
+  bgColor: string;
+}> = {
+  product_manager: { displayName: 'Product Guide', shortName: 'Guide', color: '#7C3AED', bgColor: '#F3E8FF' },
+  designer: { displayName: 'UX Expert', shortName: 'UX', color: '#F97316', bgColor: '#FFF7ED' },
+  developer: { displayName: 'Developer', shortName: 'Dev', color: '#10B981', bgColor: '#ECFDF5' },
+};
+
 // Project types
 export interface Project {
   id: string;
@@ -17,6 +31,7 @@ export interface Message {
   content: string;
   timestamp: string;
   isStreaming?: boolean;
+  agentType?: AgentType;
 }
 
 // File types

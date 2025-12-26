@@ -1,19 +1,59 @@
 'use client';
 
-import { useEffect, useRef, useLayoutEffect } from 'react';
-import { Message } from '@/types';
+import { useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { Message, AgentType } from '@/types';
 import { MessageBubble } from './MessageBubble';
+import { useAgentIntroductions } from '@/hooks/useAgentIntroductions';
 
 interface MessageListProps {
   messages: Message[];
+  projectId: string;
   isLoading?: boolean;
 }
 
-export function MessageList({ messages, isLoading = false }: MessageListProps) {
+export function MessageList({
+  messages,
+  projectId,
+  isLoading = false,
+}: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
   const prevMessageCount = useRef(0);
+
+  // Track which agents have been introduced to the user
+  const { hasMetAgent, markAgentMet } = useAgentIntroductions(projectId);
+
+  // Process messages to determine which should show the "NEW" badge
+  // An agent gets a badge only on their FIRST appearance in this session
+  // AND only if the user hasn't met them before (across sessions)
+  const messagesWithBadges = useMemo(() => {
+    const seenInThisRender = new Set<AgentType>();
+
+    return messages.map((message) => {
+      // Only assistant messages with agentType can have badges
+      if (message.role !== 'assistant' || !message.agentType) {
+        return { message, showBadge: false };
+      }
+
+      const agentType = message.agentType;
+
+      // First time seeing this agent in this render AND user hasn't met them
+      const isFirstInRender = !seenInThisRender.has(agentType);
+      const isNewToUser = !hasMetAgent(agentType);
+      const showBadge = isFirstInRender && isNewToUser;
+
+      // Mark as seen in this render
+      seenInThisRender.add(agentType);
+
+      // Mark the agent as met (persists to localStorage)
+      if (showBadge) {
+        markAgentMet(agentType);
+      }
+
+      return { message, showBadge };
+    });
+  }, [messages, hasMetAgent, markAgentMet]);
 
   // Instant scroll to bottom on initial load (no animation)
   useLayoutEffect(() => {
@@ -58,8 +98,12 @@ export function MessageList({ messages, isLoading = false }: MessageListProps) {
       className="flex-1 overflow-y-auto p-4"
       data-testid="message-list"
     >
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+      {messagesWithBadges.map(({ message, showBadge }) => (
+        <MessageBubble
+          key={message.id}
+          message={message}
+          showBadge={showBadge}
+        />
       ))}
 
       {/* Loading indicator */}

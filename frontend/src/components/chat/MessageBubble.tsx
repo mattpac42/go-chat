@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Message } from '@/types';
+import { Message, AGENT_CONFIG } from '@/types';
 import { CodeBlock } from './CodeBlock';
+import { AgentHeader } from './AgentHeader';
 
 interface MessageBubbleProps {
   message: Message;
   showCodeBlocks?: boolean; // If false, replace code blocks with friendly summary
+  showBadge?: boolean; // Show "NEW" badge for first agent introduction
 }
 
 function ChevronIcon({ isOpen, className }: { isOpen: boolean; className?: string }) {
@@ -141,7 +143,11 @@ function formatTime(timestamp: string): string {
   });
 }
 
-export function MessageBubble({ message, showCodeBlocks = false }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  showCodeBlocks = false,
+  showBadge = false,
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const timestamp = getTimestamp(message);
   const formattedTime = formatTime(timestamp);
@@ -156,6 +162,14 @@ export function MessageBubble({ message, showCodeBlocks = false }: MessageBubble
     ? preprocessMarkdown(message.content)
     : processAssistantContent(message.content, showCodeBlocks);
 
+  // Get agent config for styling (only for assistant messages with agentType)
+  const agentConfig = !isUser && message.agentType ? AGENT_CONFIG[message.agentType] : null;
+
+  // Build style object for agent left border
+  const bubbleStyle = agentConfig
+    ? { borderLeft: `3px solid ${agentConfig.color}` }
+    : undefined;
+
   return (
     <div
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
@@ -168,7 +182,13 @@ export function MessageBubble({ message, showCodeBlocks = false }: MessageBubble
             ? 'bg-teal-400 text-white rounded-br-md'
             : 'bg-gray-100 text-gray-900 rounded-bl-md'
         }`}
+        style={bubbleStyle}
       >
+        {/* Agent header for assistant messages with agentType */}
+        {!isUser && message.agentType && !isStreaming && (
+          <AgentHeader agentType={message.agentType} showBadge={showBadge} />
+        )}
+
         {/* Streaming state: show generating message with expandable raw content */}
         {isStreaming ? (
           <div>

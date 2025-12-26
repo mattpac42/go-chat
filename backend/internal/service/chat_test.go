@@ -58,7 +58,7 @@ func TestChatService_ProcessMessage_Success(t *testing.T) {
 	// Create chat service (nil for discoveryService, fileRepo and fileMetadataRepo in basic tests)
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	// Collect chunks
 	var chunks []string
@@ -153,7 +153,7 @@ func TestChatService_ProcessMessage_WithContext(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	// Process a new message
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Second message", func(string) {})
@@ -213,7 +213,7 @@ func TestChatService_ProcessMessage_ContextLimit(t *testing.T) {
 	// Set limit to 10
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 10,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "New message", func(string) {})
 	if err != nil {
@@ -242,7 +242,7 @@ func TestChatService_ProcessMessage_ProjectNotFound(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	ctx := context.Background()
 	nonExistentID := uuid.New()
@@ -285,7 +285,7 @@ func TestChatService_ProcessMessage_CodeBlockExtraction(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	result, err := chatService.ProcessMessage(ctx, project.ID, "Show me code", func(string) {})
 	if err != nil {
@@ -329,7 +329,7 @@ func TestChatService_ProcessMessage_Timeout(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, nil, nil, logger)
+	}, claudeService, nil, nil, repo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
 	if err == nil {
@@ -403,7 +403,7 @@ h1 { color: blue; }
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, fileRepo, fileMetadataRepo, logger)
+	}, claudeService, nil, nil, repo, fileRepo, fileMetadataRepo, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a homepage", func(string) {})
 	if err != nil {
@@ -501,7 +501,7 @@ console.log('Hello World');
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, repo, fileRepo, fileMetadataRepo, logger)
+	}, claudeService, nil, nil, repo, fileRepo, fileMetadataRepo, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a script", func(string) {})
 	if err != nil {
@@ -576,7 +576,7 @@ func TestChatService_ProcessMessage_DiscoveryMode(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+	}, claudeService, discoveryService, nil, projectRepo, nil, nil, logger)
 
 	result, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
 	if err != nil {
@@ -640,7 +640,7 @@ func TestChatService_ProcessMessage_DiscoveryModeAdvancesStage(t *testing.T) {
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+	}, claudeService, discoveryService, nil, projectRepo, nil, nil, logger)
 
 	// Process message - should create discovery in welcome stage and advance to problem stage
 	_, err := chatService.ProcessMessage(ctx, project.ID, "I run a bakery", func(string) {})
@@ -706,7 +706,7 @@ func TestChatService_ProcessMessage_WithoutDiscoveryService(t *testing.T) {
 	// Create chat service WITHOUT discovery service (nil)
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, nil, projectRepo, nil, nil, logger)
+	}, claudeService, nil, nil, projectRepo, nil, nil, logger)
 
 	result, err := chatService.ProcessMessage(ctx, project.ID, "Hello", func(string) {})
 	if err != nil {
@@ -763,7 +763,7 @@ func TestChatService_ProcessMessage_DiscoveryCompleteUsesDefaultPrompt(t *testin
 
 	chatService := NewChatService(ChatConfig{
 		ContextMessageLimit: 20,
-	}, claudeService, discoveryService, projectRepo, nil, nil, logger)
+	}, claudeService, discoveryService, nil, projectRepo, nil, nil, logger)
 
 	_, err := chatService.ProcessMessage(ctx, project.ID, "Create a homepage", func(string) {})
 	if err != nil {
@@ -776,5 +776,91 @@ func TestChatService_ProcessMessage_DiscoveryCompleteUsesDefaultPrompt(t *testin
 	}
 	if !strings.Contains(sentSystemPrompt, "FILE FORMAT REQUIREMENT") {
 		t.Error("expected default system prompt with FILE FORMAT REQUIREMENT")
+	}
+}
+
+func TestChatService_ProcessMessage_AgentTypeTracking(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+
+		events := []string{
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Here is your code..."}}` + "\n\n",
+			`event: message_stop` + "\n" + `data: {"type":"message_stop"}` + "\n\n",
+		}
+
+		for _, event := range events {
+			w.Write([]byte(event))
+		}
+	}))
+	defer server.Close()
+
+	logger := zerolog.Nop()
+	projectRepo := repository.NewMockProjectRepository()
+	discoveryRepo := repository.NewMockDiscoveryRepository()
+	prdRepo := repository.NewMockPRDRepository()
+	claudeService := NewClaudeService(ClaudeConfig{
+		APIKey:    "test-key",
+		Model:     "claude-sonnet-4-20250514",
+		MaxTokens: 4096,
+		BaseURL:   server.URL,
+	}, logger)
+
+	discoveryService := NewDiscoveryService(discoveryRepo, nil, logger)
+	agentContextService := NewAgentContextService(prdRepo, projectRepo, discoveryRepo, logger)
+
+	ctx := context.Background()
+	project, _ := projectRepo.Create(ctx, "Test Project")
+
+	// Create a discovery and mark it complete (so we use agent context, not discovery mode)
+	discovery, _ := discoveryRepo.Create(ctx, project.ID)
+	discoveryRepo.MarkComplete(ctx, discovery.ID)
+
+	chatService := NewChatService(ChatConfig{
+		ContextMessageLimit: 20,
+	}, claudeService, discoveryService, agentContextService, projectRepo, nil, nil, logger)
+
+	result, err := chatService.ProcessMessage(ctx, project.ID, "Build me a homepage", func(string) {})
+	if err != nil {
+		t.Fatalf("ProcessMessage failed: %v", err)
+	}
+
+	// Verify agent type was set (should be developer for "build" type message)
+	if result.AgentType == nil {
+		t.Error("expected agent type to be set")
+	} else if *result.AgentType != "developer" {
+		t.Errorf("expected agent type 'developer', got '%s'", *result.AgentType)
+	}
+
+	// Verify agent type is persisted in the message
+	if result.Message.AgentType == nil {
+		t.Error("expected message agent type to be set")
+	} else if *result.Message.AgentType != "developer" {
+		t.Errorf("expected message agent type 'developer', got '%s'", *result.Message.AgentType)
+	}
+
+	// Verify message is stored with agent type
+	messages, err := projectRepo.GetMessages(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("failed to get messages: %v", err)
+	}
+
+	// Find the assistant message
+	var assistantMsg *model.Message
+	for i := range messages {
+		if messages[i].Role == model.RoleAssistant {
+			assistantMsg = &messages[i]
+			break
+		}
+	}
+
+	if assistantMsg == nil {
+		t.Fatal("expected assistant message to be saved")
+	}
+
+	if assistantMsg.AgentType == nil {
+		t.Error("expected stored message to have agent type")
+	} else if *assistantMsg.AgentType != "developer" {
+		t.Errorf("expected stored message agent type 'developer', got '%s'", *assistantMsg.AgentType)
 	}
 }

@@ -161,7 +161,7 @@ export function ChatContainer({
       )}
 
       {/* Messages */}
-      <MessageList messages={messages} isLoading={isLoading} />
+      <MessageList messages={messages} projectId={projectId} isLoading={isLoading} />
 
       {/* Discovery Summary Card - shown when discovery reaches summary stage */}
       {showSummaryCard && (

@@ -24,13 +24,14 @@ type ChatConfig struct {
 
 // ChatService orchestrates chat interactions between WebSocket, Claude, and database.
 type ChatService struct {
-	config           ChatConfig
-	claudeService    ClaudeMessenger
-	discoveryService *DiscoveryService
-	repo             repository.ProjectRepository
-	fileRepo         repository.FileRepository
-	fileMetadataRepo repository.FileMetadataRepository
-	logger           zerolog.Logger
+	config              ChatConfig
+	claudeService       ClaudeMessenger
+	discoveryService    *DiscoveryService
+	agentContextService *AgentContextService
+	repo                repository.ProjectRepository
+	fileRepo            repository.FileRepository
+	fileMetadataRepo    repository.FileMetadataRepository
+	logger              zerolog.Logger
 }
 
 // NewChatService creates a new chat service.
@@ -38,6 +39,7 @@ func NewChatService(
 	config ChatConfig,
 	claudeService ClaudeMessenger,
 	discoveryService *DiscoveryService,
+	agentContextService *AgentContextService,
 	repo repository.ProjectRepository,
 	fileRepo repository.FileRepository,
 	fileMetadataRepo repository.FileMetadataRepository,
@@ -47,13 +49,14 @@ func NewChatService(
 		config.ContextMessageLimit = 20
 	}
 	return &ChatService{
-		config:           config,
-		claudeService:    claudeService,
-		discoveryService: discoveryService,
-		repo:             repo,
-		fileRepo:         fileRepo,
-		fileMetadataRepo: fileMetadataRepo,
-		logger:           logger,
+		config:              config,
+		claudeService:       claudeService,
+		discoveryService:    discoveryService,
+		agentContextService: agentContextService,
+		repo:                repo,
+		fileRepo:            fileRepo,
+		fileMetadataRepo:    fileMetadataRepo,
+		logger:              logger,
 	}
 }
 
@@ -63,6 +66,7 @@ type ChatResult struct {
 	Role       model.Role
 	Content    string
 	CodeBlocks []model.CodeBlock
+	AgentType  *string // "product_manager", "designer", "developer", or nil
 }
 
 // ProcessMessage handles a user message and streams the AI response.
@@ -110,6 +114,25 @@ func (s *ChatService) ProcessMessage(
 
 	// Get appropriate system prompt (discovery-aware or default)
 	systemPrompt := s.getSystemPrompt(ctx, projectID, discovery)
+
+	// Determine agent type for this message (only when not in discovery mode)
+	var agentType *string
+	if s.agentContextService != nil && (discovery == nil || discovery.Stage.IsComplete()) {
+		agentContext, err := s.agentContextService.GetContextForMessage(ctx, projectID, content)
+		if err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Msg("failed to get agent context, continuing without agent type")
+		} else if agentContext != nil {
+			agentTypeStr := string(agentContext.Agent)
+			agentType = &agentTypeStr
+			s.logger.Debug().
+				Str("projectId", projectID.String()).
+				Str("agentType", agentTypeStr).
+				Msg("determined agent type for message")
+		}
+	}
 
 	s.logger.Debug().
 		Str("projectId", projectID.String()).
@@ -230,8 +253,8 @@ func (s *ChatService) ProcessMessage(
 		}
 	}
 
-	// Save assistant response
-	assistantMsg, err := s.repo.CreateMessage(ctx, projectID, model.RoleAssistant, responseContent)
+	// Save assistant response with agent type
+	assistantMsg, err := s.repo.CreateMessageWithAgent(ctx, projectID, model.RoleAssistant, responseContent, agentType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save assistant message: %w", err)
 	}
@@ -247,6 +270,7 @@ func (s *ChatService) ProcessMessage(
 		Role:       model.RoleAssistant,
 		Content:    responseContent,
 		CodeBlocks: codeBlocks,
+		AgentType:  agentType,
 	}, nil
 }
 

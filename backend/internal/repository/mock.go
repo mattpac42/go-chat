@@ -134,8 +134,13 @@ func (r *MockProjectRepository) GetMessages(ctx context.Context, projectID uuid.
 	return messages, nil
 }
 
-// CreateMessage creates a new message.
+// CreateMessage creates a new message without agent type.
 func (r *MockProjectRepository) CreateMessage(ctx context.Context, projectID uuid.UUID, role model.Role, content string) (*model.Message, error) {
+	return r.CreateMessageWithAgent(ctx, projectID, role, content, nil)
+}
+
+// CreateMessageWithAgent creates a new message with optional agent type.
+func (r *MockProjectRepository) CreateMessageWithAgent(ctx context.Context, projectID uuid.UUID, role model.Role, content string, agentType *string) (*model.Message, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -144,6 +149,7 @@ func (r *MockProjectRepository) CreateMessage(ctx context.Context, projectID uui
 		ProjectID: projectID,
 		Role:      role,
 		Content:   content,
+		AgentType: agentType,
 		CreatedAt: time.Now().UTC(),
 	}
 

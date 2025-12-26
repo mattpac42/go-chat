@@ -20,6 +20,7 @@ type Message struct {
 	ProjectID  uuid.UUID   `db:"project_id" json:"projectId,omitempty"`
 	Role       Role        `db:"role" json:"role"`
 	Content    string      `db:"content" json:"content"`
+	AgentType  *string     `db:"agent_type" json:"agentType,omitempty"` // "product_manager", "designer", "developer", or null for user messages
 	CreatedAt  time.Time   `db:"created_at" json:"createdAt"`
 	CodeBlocks []CodeBlock `db:"-" json:"codeBlocks,omitempty"`
 }

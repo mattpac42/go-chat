@@ -24,6 +24,7 @@ type ProjectRepository interface {
 	UpdateTitle(ctx context.Context, id uuid.UUID, title string) (*model.Project, error)
 	GetMessages(ctx context.Context, projectID uuid.UUID) ([]model.Message, error)
 	CreateMessage(ctx context.Context, projectID uuid.UUID, role model.Role, content string) (*model.Message, error)
+	CreateMessageWithAgent(ctx context.Context, projectID uuid.UUID, role model.Role, content string, agentType *string) (*model.Message, error)
 }
 
 // PostgresProjectRepository implements ProjectRepository using PostgreSQL.
@@ -155,7 +156,7 @@ func (r *PostgresProjectRepository) UpdateTitle(ctx context.Context, id uuid.UUI
 // GetMessages returns all messages for a project.
 func (r *PostgresProjectRepository) GetMessages(ctx context.Context, projectID uuid.UUID) ([]model.Message, error) {
 	query := `
-		SELECT id, project_id, role, content, created_at
+		SELECT id, project_id, role, content, agent_type, created_at
 		FROM messages
 		WHERE project_id = $1
 		ORDER BY created_at ASC
@@ -169,16 +170,21 @@ func (r *PostgresProjectRepository) GetMessages(ctx context.Context, projectID u
 	return messages, nil
 }
 
-// CreateMessage creates a new message.
+// CreateMessage creates a new message without agent type (for backwards compatibility).
 func (r *PostgresProjectRepository) CreateMessage(ctx context.Context, projectID uuid.UUID, role model.Role, content string) (*model.Message, error) {
+	return r.CreateMessageWithAgent(ctx, projectID, role, content, nil)
+}
+
+// CreateMessageWithAgent creates a new message with optional agent type.
+func (r *PostgresProjectRepository) CreateMessageWithAgent(ctx context.Context, projectID uuid.UUID, role model.Role, content string, agentType *string) (*model.Message, error) {
 	query := `
-		INSERT INTO messages (project_id, role, content)
-		VALUES ($1, $2, $3)
-		RETURNING id, project_id, role, content, created_at
+		INSERT INTO messages (project_id, role, content, agent_type)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, project_id, role, content, agent_type, created_at
 	`
 
 	var message model.Message
-	if err := r.db.GetContext(ctx, &message, query, projectID, role, content); err != nil {
+	if err := r.db.GetContext(ctx, &message, query, projectID, role, content, agentType); err != nil {
 		return nil, err
 	}
 

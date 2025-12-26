@@ -80,10 +80,13 @@ func main() {
 	discoveryService := service.NewDiscoveryService(discoveryRepo, projectRepo, logger)
 	discoveryService.SetPRDService(prdService) // Wire PRD generation trigger
 
+	// Initialize agent context service
+	agentContextService := service.NewAgentContextService(prdRepo, projectRepo, discoveryRepo, logger)
+
 	// Initialize chat service
 	chatService := service.NewChatService(service.ChatConfig{
 		ContextMessageLimit: cfg.ContextMessageLimit,
-	}, claudeService, discoveryService, projectRepo, fileRepo, fileMetadataRepo, logger)
+	}, claudeService, discoveryService, agentContextService, projectRepo, fileRepo, fileMetadataRepo, logger)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(db)
