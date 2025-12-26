@@ -73,6 +73,18 @@ body {
   }
 }
 
+/* Slide up animation for achievement toasts and nudge popovers */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Touch target size for mobile */
 @layer utilities {
   .touch-target {

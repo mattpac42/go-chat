@@ -4,3 +4,4 @@ export { useProjects, useProject } from './useProjects';
 export { useFiles } from './useFiles';
 export { useDiscovery } from './useDiscovery';
 export { useAgentIntroductions } from './useAgentIntroductions';
+export { useAchievements } from './useAchievements';

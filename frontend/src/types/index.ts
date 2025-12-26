@@ -1,6 +1,9 @@
 // Discovery types
 export * from './discovery';
 
+// Achievement and Learning Journey types
+export * from './achievements';
+
 // Agent types for multi-agent chat UI
 export type AgentType = 'product_manager' | 'designer' | 'developer';
 
