@@ -97,7 +97,7 @@ export function MessageList({
   return (
     <div
       ref={containerRef}
-      className={`flex-1 overflow-y-auto p-4 ${hasBottomCard ? 'pb-2' : ''}`}
+      className={`flex-1 overflow-y-auto p-4 ${hasBottomCard ? 'pb-[500px]' : ''}`}
       data-testid="message-list"
     >
       {messagesWithBadges.map(({ message, showBadge }) => (

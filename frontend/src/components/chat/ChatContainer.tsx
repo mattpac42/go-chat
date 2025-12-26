@@ -7,6 +7,7 @@ import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
 import { DiscoveryProgress, DiscoveryStageDrawer, DiscoverySummaryCard } from '@/components/discovery';
+import { DiscoverySummaryModal } from '@/components/discovery/DiscoverySummaryModal';
 import { Message } from '@/types';
 
 interface ChatContainerProps {
@@ -51,6 +52,7 @@ export function ChatContainer({
   const [isMobile, setIsMobile] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   // Track previous loading state to detect when streaming completes
   const wasLoadingRef = useRef(false);
@@ -91,6 +93,9 @@ export function ChatContainer({
 
   // Check if we should show the summary card
   const showSummaryCard = currentStage === 'summary' && summary !== null;
+
+  // Check if discovery is complete and we have a summary to show
+  const showViewSummaryButton = currentStage === 'complete' && summary !== null;
 
   // Stage-aware input placeholder
   const getPlaceholder = () => {
@@ -133,6 +138,15 @@ export function ChatContainer({
           </h1>
         </div>
         <div className="flex items-center gap-4">
+          {showViewSummaryButton && (
+            <button
+              onClick={() => setShowSummaryModal(true)}
+              className="px-3 py-1.5 text-sm font-medium text-teal-600 bg-teal-50 rounded-lg hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 transition-colors flex items-center gap-1.5"
+            >
+              <DocumentIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Project Summary</span>
+            </button>
+          )}
           {isDiscoveryMode && (
             <DiscoveryProgress
               currentStage={currentStage}
@@ -210,6 +224,15 @@ export function ChatContainer({
         onClose={() => setShowStageDrawer(false)}
         currentStage={currentStage}
       />
+
+      {/* Summary modal for completed discovery */}
+      {summary && (
+        <DiscoverySummaryModal
+          isOpen={showSummaryModal}
+          onClose={() => setShowSummaryModal(false)}
+          summary={summary}
+        />
+      )}
     </div>
   );
 }
@@ -264,6 +287,24 @@ function ChevronDownIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M19 9l-7 7-7-7"
+      />
+    </svg>
+  );
+}
+
+function DocumentIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
       />
     </svg>
   );

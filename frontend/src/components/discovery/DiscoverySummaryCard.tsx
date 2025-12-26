@@ -119,13 +119,21 @@ export function DiscoverySummaryCard({
           {/* PROJECT Section */}
           <div>
             <SectionHeader>Project</SectionHeader>
-            <p className="text-sm text-gray-800 font-semibold">{projectName}</p>
+            {projectName ? (
+              <p className="text-sm text-gray-800 font-semibold">{projectName}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic">Project name will be generated</p>
+            )}
           </div>
 
           {/* SOLVES Section */}
           <div>
             <SectionHeader>Solves</SectionHeader>
-            <p className="text-sm text-gray-800">{solvesStatement}</p>
+            {solvesStatement ? (
+              <p className="text-sm text-gray-800">{solvesStatement}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic">Problem statement from discovery</p>
+            )}
           </div>
         </div>
 
