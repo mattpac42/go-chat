@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -15,7 +17,7 @@ import (
 func newTestDiscoveryService() (*DiscoveryService, *repository.MockDiscoveryRepository) {
 	repo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	service := NewDiscoveryService(repo, logger)
+	service := NewDiscoveryService(repo, nil, logger)
 	return service, repo
 }
 
@@ -204,6 +206,96 @@ func TestConfirmDiscovery_ErrorsOnNotFound(t *testing.T) {
 
 	_, err := service.ConfirmDiscovery(ctx, uuid.New())
 	assert.Equal(t, ErrDiscoveryNotFound, err)
+}
+
+// MockPRDGenerator is a mock implementation of PRDGenerator for testing.
+type MockPRDGenerator struct {
+	GenerateAllPRDsCalled bool
+	CalledWithDiscoveryID uuid.UUID
+	ReturnError           error
+	wg                    sync.WaitGroup
+}
+
+func NewMockPRDGenerator() *MockPRDGenerator {
+	m := &MockPRDGenerator{}
+	m.wg.Add(1)
+	return m
+}
+
+func (m *MockPRDGenerator) GenerateAllPRDs(ctx context.Context, discoveryID uuid.UUID) error {
+	m.GenerateAllPRDsCalled = true
+	m.CalledWithDiscoveryID = discoveryID
+	m.wg.Done()
+	return m.ReturnError
+}
+
+func (m *MockPRDGenerator) WaitForCall(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		m.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+func TestConfirmDiscovery_TriggersPRDGeneration(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Create and configure mock PRD generator
+	mockPRDGen := NewMockPRDGenerator()
+	service.SetPRDService(mockPRDGen)
+
+	// Create discovery and advance to summary
+	discovery, err := service.GetOrCreateDiscovery(ctx, projectID)
+	require.NoError(t, err)
+
+	for i := 0; i < 4; i++ {
+		discovery, err = service.AdvanceStage(ctx, discovery.ID)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, model.StageSummary, discovery.Stage)
+
+	// Confirm
+	discovery, err = service.ConfirmDiscovery(ctx, discovery.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.StageComplete, discovery.Stage)
+
+	// Wait for async PRD generation to be triggered
+	called := mockPRDGen.WaitForCall(1 * time.Second)
+	assert.True(t, called, "GenerateAllPRDs should have been called")
+	assert.True(t, mockPRDGen.GenerateAllPRDsCalled)
+	assert.Equal(t, discovery.ID, mockPRDGen.CalledWithDiscoveryID)
+}
+
+func TestConfirmDiscovery_WorksWithoutPRDService(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Don't set PRD service - should still work
+
+	// Create discovery and advance to summary
+	discovery, err := service.GetOrCreateDiscovery(ctx, projectID)
+	require.NoError(t, err)
+
+	for i := 0; i < 4; i++ {
+		discovery, err = service.AdvanceStage(ctx, discovery.ID)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, model.StageSummary, discovery.Stage)
+
+	// Confirm - should not error even without PRD service
+	discovery, err = service.ConfirmDiscovery(ctx, discovery.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.StageComplete, discovery.Stage)
 }
 
 func TestUpdateDiscoveryData(t *testing.T) {

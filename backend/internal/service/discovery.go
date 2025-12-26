@@ -14,10 +14,17 @@ import (
 	"gitlab.yuki.lan/goodies/gochat/backend/internal/service/prompts"
 )
 
+// PRDGenerator defines the interface for PRD generation that DiscoveryService uses.
+// This allows DiscoveryService to trigger PRD generation without depending on the full PRDService.
+type PRDGenerator interface {
+	GenerateAllPRDs(ctx context.Context, discoveryID uuid.UUID) error
+}
+
 // DiscoveryService orchestrates the discovery flow.
 type DiscoveryService struct {
 	repo          repository.DiscoveryRepository
 	projectRepo   repository.ProjectRepository
+	prdService    PRDGenerator
 	promptBuilder *prompts.DiscoveryPromptBuilder
 	logger        zerolog.Logger
 }
@@ -30,6 +37,12 @@ func NewDiscoveryService(repo repository.DiscoveryRepository, projectRepo reposi
 		promptBuilder: prompts.NewDiscoveryPromptBuilder(),
 		logger:        logger,
 	}
+}
+
+// SetPRDService sets the PRD generator service for triggering PRD generation after discovery confirmation.
+// This is optional - if not set, PRD generation will not be triggered automatically.
+func (s *DiscoveryService) SetPRDService(prdService PRDGenerator) {
+	s.prdService = prdService
 }
 
 // ErrInvalidStageTransition is returned when attempting an invalid stage transition.
@@ -236,7 +249,22 @@ func (s *DiscoveryService) ConfirmDiscovery(ctx context.Context, discoveryID uui
 		Str("discoveryId", discoveryID.String()).
 		Msg("confirming discovery")
 
-	return s.repo.MarkComplete(ctx, discoveryID)
+	// Mark discovery as complete
+	result, err := s.repo.MarkComplete(ctx, discoveryID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Trigger async PRD generation if PRD service is configured
+	if s.prdService != nil {
+		go func() {
+			if err := s.prdService.GenerateAllPRDs(context.Background(), discoveryID); err != nil {
+				s.logger.Error().Err(err).Str("discoveryId", discoveryID.String()).Msg("failed to generate PRDs")
+			}
+		}()
+	}
+
+	return result, nil
 }
 
 // ResetDiscovery deletes the discovery and creates a new one for the same project.

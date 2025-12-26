@@ -41,7 +41,7 @@ func setupDiscoveryTestRouter(discoveryService *service.DiscoveryService) *gin.E
 func TestGetDiscovery_CreatesNew(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -66,7 +66,7 @@ func TestGetDiscovery_CreatesNew(t *testing.T) {
 func TestGetDiscovery_InvalidProjectID(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	req, _ := http.NewRequest("GET", "/api/projects/invalid-uuid/discovery", nil)
@@ -80,7 +80,7 @@ func TestGetDiscovery_InvalidProjectID(t *testing.T) {
 func TestGetDiscovery_WithSummary(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	// Create a discovery and advance it to summary stage
@@ -139,7 +139,7 @@ func TestGetDiscovery_WithSummary(t *testing.T) {
 func TestAdvanceStage_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -164,7 +164,7 @@ func TestAdvanceStage_Success(t *testing.T) {
 func TestAdvanceStage_NotFound(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -180,7 +180,7 @@ func TestAdvanceStage_NotFound(t *testing.T) {
 func TestAdvanceStage_AlreadyComplete(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -207,7 +207,7 @@ func TestAdvanceStage_AlreadyComplete(t *testing.T) {
 func TestUpdateData_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -245,7 +245,7 @@ func TestUpdateData_Success(t *testing.T) {
 func TestUpdateData_AlreadyComplete(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -274,7 +274,7 @@ func TestUpdateData_AlreadyComplete(t *testing.T) {
 func TestAddUser_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -312,7 +312,7 @@ func TestAddUser_Success(t *testing.T) {
 func TestAddUser_MissingDescription(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -342,7 +342,7 @@ func TestAddUser_MissingDescription(t *testing.T) {
 func TestAddFeature_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -376,7 +376,7 @@ func TestAddFeature_Success(t *testing.T) {
 func TestAddFeature_DefaultVersion(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -408,7 +408,7 @@ func TestAddFeature_DefaultVersion(t *testing.T) {
 func TestAddFeature_MissingName(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -438,7 +438,7 @@ func TestAddFeature_MissingName(t *testing.T) {
 func TestConfirmDiscovery_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -467,7 +467,7 @@ func TestConfirmDiscovery_Success(t *testing.T) {
 func TestConfirmDiscovery_NotInSummaryStage(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -490,7 +490,7 @@ func TestConfirmDiscovery_NotInSummaryStage(t *testing.T) {
 func TestResetDiscovery_Success(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -526,7 +526,7 @@ func TestResetDiscovery_Success(t *testing.T) {
 func TestResetDiscovery_NotFound(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()
@@ -542,7 +542,7 @@ func TestResetDiscovery_NotFound(t *testing.T) {
 func TestFullDiscoveryFlow(t *testing.T) {
 	mockRepo := repository.NewMockDiscoveryRepository()
 	logger := zerolog.Nop()
-	discoveryService := service.NewDiscoveryService(mockRepo, logger)
+	discoveryService := service.NewDiscoveryService(mockRepo, nil, logger)
 	router := setupDiscoveryTestRouter(discoveryService)
 
 	projectID := uuid.New()

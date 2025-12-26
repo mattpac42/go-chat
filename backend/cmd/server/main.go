@@ -72,8 +72,13 @@ func main() {
 		}, logger)
 	}
 
+	// Initialize PRD repository and service
+	prdRepo := repository.NewPostgresPRDRepository(db)
+	prdService := service.NewPRDService(prdRepo, discoveryRepo, claudeService, logger)
+
 	// Initialize discovery service
 	discoveryService := service.NewDiscoveryService(discoveryRepo, projectRepo, logger)
+	discoveryService.SetPRDService(prdService) // Wire PRD generation trigger
 
 	// Initialize chat service
 	chatService := service.NewChatService(service.ChatConfig{
@@ -85,6 +90,7 @@ func main() {
 	projectHandler := handler.NewProjectHandler(projectRepo)
 	fileHandler := handler.NewFileHandler(fileRepo, projectRepo, fileMetadataRepo)
 	discoveryHandler := handler.NewDiscoveryHandler(discoveryService, logger)
+	prdHandler := handler.NewPRDHandler(prdService, logger)
 	wsHandler := handler.NewWebSocketHandler(chatService, logger)
 
 	// Set up Gin
@@ -125,11 +131,25 @@ func main() {
 			projects.POST("/:id/discovery/features", discoveryHandler.AddFeature)
 			projects.POST("/:id/discovery/confirm", discoveryHandler.ConfirmDiscovery)
 			projects.DELETE("/:id/discovery", discoveryHandler.ResetDiscovery)
+
+			// PRD routes (project-scoped)
+			projects.GET("/:id/prds", prdHandler.ListPRDs)
+			projects.GET("/:id/active-prd", prdHandler.GetActivePRD)
+			projects.PUT("/:id/active-prd", prdHandler.SetActivePRD)
+			projects.DELETE("/:id/active-prd", prdHandler.ClearActivePRD)
 		}
 		files := api.Group("/files")
 		{
 			files.GET("/:id", fileHandler.GetFile)
 			files.GET("/:id/download", fileHandler.DownloadFile)
+		}
+
+		// PRD routes (direct PRD access)
+		prds := api.Group("/prds")
+		{
+			prds.GET("/:id", prdHandler.GetPRD)
+			prds.PUT("/:id/status", prdHandler.UpdatePRDStatus)
+			prds.POST("/:id/retry", prdHandler.RetryPRDGeneration)
 		}
 	}
 

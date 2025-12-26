@@ -569,7 +569,7 @@ func TestChatService_ProcessMessage_DiscoveryMode(t *testing.T) {
 		BaseURL:   server.URL,
 	}, logger)
 
-	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+	discoveryService := NewDiscoveryService(discoveryRepo, nil, logger)
 
 	ctx := context.Background()
 	project, _ := projectRepo.Create(ctx, "Test Project")
@@ -633,7 +633,7 @@ func TestChatService_ProcessMessage_DiscoveryModeAdvancesStage(t *testing.T) {
 		BaseURL:   server.URL,
 	}, logger)
 
-	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+	discoveryService := NewDiscoveryService(discoveryRepo, nil, logger)
 
 	ctx := context.Background()
 	project, _ := projectRepo.Create(ctx, "Test Project")
@@ -752,7 +752,7 @@ func TestChatService_ProcessMessage_DiscoveryCompleteUsesDefaultPrompt(t *testin
 		BaseURL:   server.URL,
 	}, logger)
 
-	discoveryService := NewDiscoveryService(discoveryRepo, logger)
+	discoveryService := NewDiscoveryService(discoveryRepo, nil, logger)
 
 	ctx := context.Background()
 	project, _ := projectRepo.Create(ctx, "Test Project")
