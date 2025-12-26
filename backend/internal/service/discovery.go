@@ -493,6 +493,13 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 		return nil
 	}
 
+	// Log extracted data for debugging
+	s.logger.Debug().
+		Interface("extracted", extracted).
+		Str("discoveryId", discovery.ID.String()).
+		Str("stage", string(discovery.Stage)).
+		Msg("processing extracted discovery data")
+
 	update := &DiscoveryDataUpdate{}
 	hasUpdates := false
 
@@ -524,13 +531,22 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 
 	// Extract project name (check top-level and nested under "summary")
 	if pn, ok := extracted["project_name"].(string); ok && pn != "" {
+		s.logger.Info().Str("project_name", pn).Msg("found project_name at top level")
 		update.ProjectName = &pn
 		hasUpdates = true
 	} else if summary, ok := extracted["summary"].(map[string]interface{}); ok {
 		if pn, ok := summary["project_name"].(string); ok && pn != "" {
+			s.logger.Info().Str("project_name", pn).Msg("found project_name in summary")
 			update.ProjectName = &pn
 			hasUpdates = true
 		}
+	}
+
+	// Log if project_name not found in summary stage
+	if update.ProjectName == nil && discovery.Stage == model.StageSummary {
+		s.logger.Warn().
+			Interface("extracted", extracted).
+			Msg("project_name not found in summary stage metadata")
 	}
 
 	// Extract solves statement (check top-level and nested under "summary")
