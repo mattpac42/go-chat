@@ -225,7 +225,7 @@ export function MessageBubble({
           <>
             <div className={`prose prose-sm max-w-none break-words ${
               isUser
-                ? 'prose-invert prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white'
+                ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white'
                 : 'prose-gray'
             }`}>
               <ReactMarkdown
@@ -292,12 +292,16 @@ export function MessageBubble({
                   h3: ({ children }) => (
                     <h3 className={`text-base font-bold mb-2 ${isUser ? 'text-white' : 'text-gray-900'}`}>{children}</h3>
                   ),
-                  // Style lists
+                  // Style lists - use list-outside with padding for proper alignment
                   ul: ({ children }) => (
-                    <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
+                    <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
+                    <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>
+                  ),
+                  // Style list items to ensure inline display of number and content
+                  li: ({ children }) => (
+                    <li className="pl-1">{children}</li>
                   ),
                   // Style strong/bold
                   strong: ({ children }) => (

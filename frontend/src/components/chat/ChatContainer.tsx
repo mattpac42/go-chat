@@ -50,6 +50,7 @@ export function ChatContainer({
   const [showStageDrawer, setShowStageDrawer] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
 
   // Track previous loading state to detect when streaming completes
   const wasLoadingRef = useRef(false);
@@ -161,17 +162,38 @@ export function ChatContainer({
       )}
 
       {/* Messages */}
-      <MessageList messages={messages} projectId={projectId} isLoading={isLoading} />
+      <MessageList messages={messages} projectId={projectId} isLoading={isLoading} hasBottomCard={showSummaryCard} />
 
       {/* Discovery Summary Card - shown when discovery reaches summary stage */}
       {showSummaryCard && (
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-          <DiscoverySummaryCard
-            summary={summary}
-            onEdit={handleEditDiscovery}
-            onConfirm={handleConfirmDiscovery}
-            isConfirming={isConfirming}
-          />
+        <div className="border-t border-gray-100 bg-gray-50">
+          {isSummaryCollapsed ? (
+            <button
+              onClick={() => setIsSummaryCollapsed(false)}
+              className="w-full px-4 py-3 flex items-center justify-between text-sm text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <span className="font-medium">Show Project Summary</span>
+              <ChevronUpIcon className="w-4 h-4" />
+            </button>
+          ) : (
+            <div className="px-4 py-3">
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={() => setIsSummaryCollapsed(true)}
+                  className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <span>Collapse</span>
+                  <ChevronDownIcon className="w-3 h-3" />
+                </button>
+              </div>
+              <DiscoverySummaryCard
+                summary={summary}
+                onEdit={handleEditDiscovery}
+                onConfirm={handleConfirmDiscovery}
+                isConfirming={isConfirming}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -206,6 +228,42 @@ function MenuIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M4 6h16M4 12h16M4 18h16"
+      />
+    </svg>
+  );
+}
+
+function ChevronUpIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M5 15l7-7 7 7"
+      />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M19 9l-7 7-7-7"
       />
     </svg>
   );

@@ -199,14 +199,14 @@ export function DiscoverySummaryCard({
 
       {/* Action Buttons */}
       <div className="mt-6 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:justify-between gap-3">
-        {/* Edit Details - Ghost button */}
+        {/* Start Over - Ghost button (resets discovery) */}
         <button
           onClick={onEdit}
           disabled={isConfirming}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-transparent border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors order-2 md:order-1"
-          aria-label="Edit discovery details"
+          aria-label="Start over with discovery"
         >
-          Edit Details
+          Start Over
         </button>
 
         {/* Start Building - Primary button */}

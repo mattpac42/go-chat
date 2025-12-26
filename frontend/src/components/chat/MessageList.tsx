@@ -9,12 +9,14 @@ interface MessageListProps {
   messages: Message[];
   projectId: string;
   isLoading?: boolean;
+  hasBottomCard?: boolean;
 }
 
 export function MessageList({
   messages,
   projectId,
   isLoading = false,
+  hasBottomCard = false,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ export function MessageList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4"
+      className={`flex-1 overflow-y-auto p-4 ${hasBottomCard ? 'pb-2' : ''}`}
       data-testid="message-list"
     >
       {messagesWithBadges.map(({ message, showBadge }) => (

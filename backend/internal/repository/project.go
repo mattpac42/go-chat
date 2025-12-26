@@ -62,7 +62,7 @@ func (r *PostgresProjectRepository) List(ctx context.Context) ([]model.ProjectLi
 
 // GetByID returns a project by ID.
 func (r *PostgresProjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Project, error) {
-	query := `SELECT id, title, created_at, updated_at FROM projects WHERE id = $1`
+	query := `SELECT id, title, active_prd_id, created_at, updated_at FROM projects WHERE id = $1`
 
 	var project model.Project
 	if err := r.db.GetContext(ctx, &project, query, id); err != nil {
@@ -80,7 +80,7 @@ func (r *PostgresProjectRepository) Create(ctx context.Context, title string) (*
 	query := `
 		INSERT INTO projects (title)
 		VALUES ($1)
-		RETURNING id, title, created_at, updated_at
+		RETURNING id, title, active_prd_id, created_at, updated_at
 	`
 
 	var project model.Project
@@ -139,7 +139,7 @@ func (r *PostgresProjectRepository) UpdateTitle(ctx context.Context, id uuid.UUI
 		UPDATE projects
 		SET title = $1, updated_at = NOW()
 		WHERE id = $2
-		RETURNING id, title, created_at, updated_at
+		RETURNING id, title, active_prd_id, created_at, updated_at
 	`
 
 	var project model.Project

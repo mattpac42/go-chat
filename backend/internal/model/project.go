@@ -8,12 +8,13 @@ import (
 
 // Project represents a chat project/conversation.
 type Project struct {
-	ID           uuid.UUID `db:"id" json:"id"`
-	Title        string    `db:"title" json:"title"`
-	CreatedAt    time.Time `db:"created_at" json:"createdAt"`
-	UpdatedAt    time.Time `db:"updated_at" json:"updatedAt"`
-	MessageCount int       `db:"-" json:"messageCount,omitempty"`
-	Messages     []Message `db:"-" json:"messages,omitempty"`
+	ID           uuid.UUID  `db:"id" json:"id"`
+	Title        string     `db:"title" json:"title"`
+	ActivePRDID  *uuid.UUID `db:"active_prd_id" json:"activePrdId,omitempty"`
+	CreatedAt    time.Time  `db:"created_at" json:"createdAt"`
+	UpdatedAt    time.Time  `db:"updated_at" json:"updatedAt"`
+	MessageCount int        `db:"-" json:"messageCount,omitempty"`
+	Messages     []Message  `db:"-" json:"messages,omitempty"`
 }
 
 // ProjectListItem represents a project in list view.
