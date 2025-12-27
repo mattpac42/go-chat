@@ -45,6 +45,7 @@ type ErrorResponse struct {
 	Type      string    `json:"type"`
 	Error     string    `json:"error"`
 	Code      string    `json:"code,omitempty"`
+	MessageID string    `json:"messageId,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -110,7 +111,7 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		case "chat_message":
 			h.handleChatMessage(c.Request.Context(), conn, &writeMu, projectID, msg)
 		default:
-			h.sendError(conn, &writeMu, "unknown message type", "UNKNOWN_TYPE")
+			h.sendError(conn, &writeMu, "unknown message type", "UNKNOWN_TYPE", "")
 		}
 	}
 
@@ -151,7 +152,8 @@ func (h *WebSocketHandler) handleChatMessage(ctx context.Context, conn *websocke
 	}
 
 	// Create a context with timeout for the Claude API call
-	chatCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	// 180 seconds allows for longer responses (detailed code comments, multiple files)
+	chatCtx, cancel := context.WithTimeout(ctx, 180*time.Second)
 	defer cancel()
 
 	result, err := h.chatService.ProcessMessage(chatCtx, projectID, msg.Content, onChunk)
@@ -159,7 +161,7 @@ func (h *WebSocketHandler) handleChatMessage(ctx context.Context, conn *websocke
 		h.logger.Error().Err(err).
 			Str("projectId", projectID.String()).
 			Msg("failed to process message")
-		h.sendError(conn, mu, "Failed to generate response", "AI_ERROR")
+		h.sendError(conn, mu, "Failed to generate response. Please try a simpler request.", "AI_ERROR", messageID)
 		return
 	}
 
@@ -193,7 +195,7 @@ func (h *WebSocketHandler) sendMessageComplete(conn *websocket.Conn, mu *sync.Mu
 	conn.WriteJSON(completeMsg)
 }
 
-func (h *WebSocketHandler) sendError(conn *websocket.Conn, mu *sync.Mutex, errorMsg string, code string) {
+func (h *WebSocketHandler) sendError(conn *websocket.Conn, mu *sync.Mutex, errorMsg string, code string, messageID string) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -201,6 +203,7 @@ func (h *WebSocketHandler) sendError(conn *websocket.Conn, mu *sync.Mutex, error
 		Type:      "error",
 		Error:     errorMsg,
 		Code:      code,
+		MessageID: messageID,
 		Timestamp: time.Now().UTC(),
 	}
 	conn.WriteJSON(response)
