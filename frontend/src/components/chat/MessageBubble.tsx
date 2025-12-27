@@ -320,7 +320,7 @@ export function MessageBubble({
         ) : (
           /* Normal rendering for completed messages */
           <>
-            <div className={`prose prose-sm max-w-none break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-words ${
+            <div className={`prose prose-sm max-w-none break-words overflow-hidden [&_pre]:overflow-x-auto [&_pre]:code-scrollbar [&_code]:break-words ${
               isUser
                 ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
                 : 'prose-gray'

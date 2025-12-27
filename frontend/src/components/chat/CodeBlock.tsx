@@ -104,7 +104,7 @@ export function CodeBlock({ code, language = 'text', defaultCollapsed = true }: 
           opacity: isCollapsed ? 0 : 1,
         }}
       >
-        <div className="overflow-x-auto max-w-full">
+        <div className="overflow-x-auto max-w-full code-scrollbar">
           <pre className="p-4 text-sm m-0">
             <code className="text-gray-100 font-mono whitespace-pre block">{code}</code>
           </pre>
