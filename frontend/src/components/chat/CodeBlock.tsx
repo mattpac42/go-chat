@@ -58,7 +58,7 @@ export function CodeBlock({ code, language = 'text', defaultCollapsed = true }: 
   }, []);
 
   return (
-    <div className="relative my-2 rounded-lg overflow-hidden bg-gray-800">
+    <div className="relative my-2 rounded-lg overflow-hidden bg-gray-800 min-w-0 max-w-full">
       {/* Clickable header with language label, line count, and copy button */}
       <div
         className="flex items-center justify-between px-4 py-2 bg-gray-900/50 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-900/70 transition-colors"
@@ -104,9 +104,9 @@ export function CodeBlock({ code, language = 'text', defaultCollapsed = true }: 
           opacity: isCollapsed ? 0 : 1,
         }}
       >
-        <div className="overflow-x-auto">
-          <pre className="p-4 text-sm">
-            <code className="text-gray-100 font-mono whitespace-pre">{code}</code>
+        <div className="overflow-x-auto max-w-full">
+          <pre className="p-4 text-sm m-0">
+            <code className="text-gray-100 font-mono whitespace-pre block">{code}</code>
           </pre>
         </div>
       </div>

@@ -274,7 +274,7 @@ export function MessageBubble({
       data-role={message.role}
     >
       <div
-        className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-3 ${
+        className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-3 overflow-hidden min-w-0 ${
           isUser
             ? 'bg-teal-400 text-white rounded-br-md'
             : 'bg-gray-100 text-gray-900 rounded-bl-md'
@@ -320,7 +320,7 @@ export function MessageBubble({
         ) : (
           /* Normal rendering for completed messages */
           <>
-            <div className={`prose prose-sm max-w-none break-words ${
+            <div className={`prose prose-sm max-w-none break-words overflow-hidden [&_pre]:overflow-x-auto [&_code]:break-words ${
               isUser
                 ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
                 : 'prose-gray'
