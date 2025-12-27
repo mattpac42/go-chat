@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useDiscovery } from '@/hooks/useDiscovery';
-import { MessageList } from './MessageList';
+import { useDiscoveryExperience } from '@/hooks/useDiscoveryExperience';
+import { MessageList, MessageListHandle } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
-import { DiscoveryProgress, DiscoveryStageDrawer, DiscoverySummaryCard } from '@/components/discovery';
+import { DiscoveryProgress, DiscoveryStageDrawer } from '@/components/discovery';
 import { DiscoverySummaryModal } from '@/components/discovery/DiscoverySummaryModal';
 import { Message } from '@/types';
 
@@ -16,6 +17,8 @@ interface ChatContainerProps {
   initialMessages?: Message[];
   onMenuClick?: () => void;
   onStreamingComplete?: () => void;
+  onDiscoveryConfirmed?: () => void;
+  onRefetchMessages?: () => Promise<void>;
 }
 
 export function ChatContainer({
@@ -24,6 +27,8 @@ export function ChatContainer({
   initialMessages = [],
   onMenuClick,
   onStreamingComplete,
+  onDiscoveryConfirmed,
+  onRefetchMessages,
 }: ChatContainerProps) {
   const {
     messages,
@@ -46,13 +51,20 @@ export function ChatContainer({
     summary,
     confirmDiscovery,
     resetDiscovery,
+    skipDiscovery,
     refetch: refetchDiscovery,
   } = useDiscovery(projectId);
+
+  // Track if user has completed discovery before (for skip option)
+  const { hasCompletedBefore, isLoaded: experienceLoaded, markDiscoveryCompleted } = useDiscoveryExperience();
+
   const [showStageDrawer, setShowStageDrawer] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
+  const [isStartingDiscovery, setIsStartingDiscovery] = useState(false);
+  const messageListRef = useRef<MessageListHandle>(null);
 
   // Track previous loading state to detect when streaming completes
   const wasLoadingRef = useRef(false);
@@ -80,6 +92,12 @@ export function ChatContainer({
     setIsConfirming(true);
     try {
       await confirmDiscovery();
+      // Mark that user has completed discovery (for skip option on future projects)
+      markDiscoveryCompleted();
+      // Notify parent to refetch project data (title may have changed)
+      onDiscoveryConfirmed?.();
+      // Close the modal after successful confirmation
+      setShowSummaryModal(false);
     } catch {
       // Error is handled in the hook
     } finally {
@@ -88,18 +106,67 @@ export function ChatContainer({
   };
 
   const handleEditDiscovery = () => {
+    // Close modal and return to chat for editing
+    // Don't reset discovery - just let user continue the conversation
+    setShowSummaryModal(false);
+  };
+
+  const handleStartOver = () => {
+    // Close modal and reset discovery
+    setShowSummaryModal(false);
     resetDiscovery();
   };
 
+  // Handler for skipping discovery (for returning users)
+  const handleSkipDiscovery = useCallback(async () => {
+    setIsSkipping(true);
+    try {
+      const success = await skipDiscovery();
+      if (success) {
+        markDiscoveryCompleted();
+      }
+    } finally {
+      setIsSkipping(false);
+    }
+  }, [skipDiscovery, markDiscoveryCompleted]);
+
+  // Handler for starting discovery (user clicks CTA)
+  const handleStartDiscovery = useCallback(async () => {
+    if (!onRefetchMessages) return;
+
+    setIsStartingDiscovery(true);
+    try {
+      // Give the backend a moment to generate the welcome message, then refetch
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await onRefetchMessages();
+      // If still no messages after first attempt, try again
+      if (messages.length === 0) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await onRefetchMessages();
+      }
+    } finally {
+      setIsStartingDiscovery(false);
+    }
+  }, [onRefetchMessages, messages.length]);
+
   // Check if we should show the summary card
-  const showSummaryCard = currentStage === 'summary' && summary !== null;
+  // Only show when we have meaningful summary data (at least MVP features)
+  const hasMeaningfulSummary = summary !== null &&
+    summary.mvpFeatures && summary.mvpFeatures.length > 0;
+  const showSummaryCard = currentStage === 'summary' && hasMeaningfulSummary;
 
   // Check if discovery is complete and we have a summary to show
   const showViewSummaryButton = currentStage === 'complete' && summary !== null;
 
+
+  // Check if we are waiting for the first message in discovery mode
+  const isWaitingForDiscoveryStart = isDiscoveryMode && messages.length === 0;
+
   // Stage-aware input placeholder
   const getPlaceholder = () => {
     if (connectionStatus !== 'connected') return 'Connecting...';
+    if (isStartingDiscovery) return 'Root is joining...';
+    if (isWaitingForDiscoveryStart) return 'Click the button above to start...';
     if (isLoading) return 'Waiting for response...';
     if (!isDiscoveryMode) return 'Describe what you want to build...';
 
@@ -176,45 +243,35 @@ export function ChatContainer({
       )}
 
       {/* Messages */}
-      <MessageList messages={messages} projectId={projectId} isLoading={isLoading} hasBottomCard={showSummaryCard} />
+      <MessageList
+        ref={messageListRef}
+        messages={messages}
+        projectId={projectId}
+        isLoading={isLoading}
+        isDiscoveryMode={isDiscoveryMode}
+        showSkipDiscovery={experienceLoaded && hasCompletedBefore && !isSkipping}
+        onSkipDiscovery={handleSkipDiscovery}
+        onStartDiscovery={handleStartDiscovery}
+        isStartingDiscovery={isStartingDiscovery}
+      />
 
-      {/* Discovery Summary Card - shown when discovery reaches summary stage */}
+      {/* Discovery Complete Notification Bar - slim bar that opens modal */}
       {showSummaryCard && (
-        <div className="border-t border-gray-100 bg-gray-50">
-          {isSummaryCollapsed ? (
-            <button
-              onClick={() => setIsSummaryCollapsed(false)}
-              className="w-full px-4 py-3 flex items-center justify-between text-sm text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <span className="font-medium">Show Project Summary</span>
-              <ChevronUpIcon className="w-4 h-4" />
-            </button>
-          ) : (
-            <div className="px-4 py-3">
-              <div className="flex justify-end mb-2">
-                <button
-                  onClick={() => setIsSummaryCollapsed(true)}
-                  className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                >
-                  <span>Collapse</span>
-                  <ChevronDownIcon className="w-3 h-3" />
-                </button>
-              </div>
-              <DiscoverySummaryCard
-                summary={summary}
-                onEdit={handleEditDiscovery}
-                onConfirm={handleConfirmDiscovery}
-                isConfirming={isConfirming}
-              />
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => setShowSummaryModal(true)}
+          className="w-full px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white flex items-center justify-center gap-2 hover:from-teal-600 hover:to-teal-700 transition-all group"
+        >
+          <CheckCircleIcon className="w-5 h-5" />
+          <span className="font-medium">Discovery complete!</span>
+          <span className="text-teal-100">Review your project summary</span>
+          <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       )}
 
       {/* Input */}
       <ChatInput
         onSend={sendMessage}
-        disabled={connectionStatus !== 'connected' || isLoading}
+        disabled={connectionStatus !== 'connected' || isLoading || isWaitingForDiscoveryStart || isStartingDiscovery}
         placeholder={getPlaceholder()}
       />
 
@@ -225,12 +282,19 @@ export function ChatContainer({
         currentStage={currentStage}
       />
 
-      {/* Summary modal for completed discovery */}
+      {/* Summary modal - action mode when in summary stage, view-only when complete */}
       {summary && (
         <DiscoverySummaryModal
           isOpen={showSummaryModal}
           onClose={() => setShowSummaryModal(false)}
           summary={summary}
+          // Pass action handlers only when in summary stage (pre-confirmation)
+          {...(showSummaryCard ? {
+            onConfirm: handleConfirmDiscovery,
+            onEdit: handleEditDiscovery,
+            onStartOver: handleStartOver,
+            isConfirming: isConfirming,
+          } : {})}
         />
       )}
     </div>
@@ -256,7 +320,7 @@ function MenuIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronUpIcon({ className }: { className?: string }) {
+function CheckCircleIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -268,13 +332,13 @@ function ChevronUpIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M5 15l7-7 7 7"
+        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
       />
     </svg>
   );
 }
 
-function ChevronDownIcon({ className }: { className?: string }) {
+function ChevronRightIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -286,7 +350,7 @@ function ChevronDownIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M19 9l-7 7-7-7"
+        d="M9 5l7 7-7 7"
       />
     </svg>
   );

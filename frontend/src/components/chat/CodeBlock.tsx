@@ -1,16 +1,49 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface CodeBlockProps {
   code: string;
   language?: string;
+  defaultCollapsed?: boolean;
 }
 
-export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
+function ChevronIcon({ isOpen, className }: { isOpen: boolean; className?: string }) {
+  return (
+    <svg
+      className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${className || ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 5l7 7-7 7"
+      />
+    </svg>
+  );
+}
 
-  const handleCopy = useCallback(async () => {
+export function CodeBlock({ code, language = 'text', defaultCollapsed = true }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Calculate line count for the hint
+  const lineCount = code.split('\n').length;
+
+  // Measure content height for smooth animation
+  useEffect(() => {
+    if (contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight);
+    }
+  }, [code]);
+
+  const handleCopy = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent toggle when clicking copy
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
@@ -20,11 +53,29 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
     }
   }, [code]);
 
+  const handleToggle = useCallback(() => {
+    setIsCollapsed(prev => !prev);
+  }, []);
+
   return (
     <div className="relative my-2 rounded-lg overflow-hidden bg-gray-800">
-      {/* Language label and copy button */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900/50 border-b border-gray-700">
-        <span className="text-xs text-gray-400 font-mono">{language}</span>
+      {/* Clickable header with language label, line count, and copy button */}
+      <div
+        className="flex items-center justify-between px-4 py-2 bg-gray-900/50 border-b border-gray-700 cursor-pointer select-none hover:bg-gray-900/70 transition-colors"
+        onClick={handleToggle}
+        role="button"
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? `Expand ${language} code block` : `Collapse ${language} code block`}
+      >
+        <div className="flex items-center gap-2">
+          <ChevronIcon isOpen={!isCollapsed} className="text-gray-400" />
+          <span className="text-xs text-gray-400 font-mono">{language}</span>
+          {isCollapsed && (
+            <span className="text-xs text-gray-500">
+              {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+            </span>
+          )}
+        </div>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-700"
@@ -44,11 +95,20 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
         </button>
       </div>
 
-      {/* Code content */}
-      <div className="overflow-x-auto">
-        <pre className="p-4 text-sm">
-          <code className="text-gray-100 font-mono whitespace-pre">{code}</code>
-        </pre>
+      {/* Collapsible code content with smooth animation */}
+      <div
+        ref={contentRef}
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{
+          maxHeight: isCollapsed ? 0 : (contentHeight ?? 'none'),
+          opacity: isCollapsed ? 0 : 1,
+        }}
+      >
+        <div className="overflow-x-auto">
+          <pre className="p-4 text-sm">
+            <code className="text-gray-100 font-mono whitespace-pre">{code}</code>
+          </pre>
+        </div>
       </div>
     </div>
   );

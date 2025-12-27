@@ -38,6 +38,98 @@ function preprocessMarkdown(content: string): string {
 }
 
 /**
+ * Convert inline lists to proper markdown block lists
+ * Handles patterns like:
+ * - "1. Item 2. Item 3. Item" -> proper numbered list
+ * - "* Item * Item" -> proper bullet list (only asterisks, not dashes)
+ *
+ * IMPORTANT: Only converts truly inline lists (no newlines between items).
+ * If the content already has proper newlines, it's left alone.
+ */
+function convertInlineLists(content: string): string {
+  let result = content;
+
+  // Skip if content already has proper list formatting with newlines
+  // This check prevents mangling properly formatted markdown
+  if (/\n\s*[\*\-]\s+/.test(result) || /\n\s*\d+\.\s+/.test(result)) {
+    return result;
+  }
+
+  // Convert inline numbered lists: "1. Item 2. Item 3. Item" (all on one line)
+  // Only match if there are multiple numbered items without newlines between them
+  if (/\d+\.\s+[^\n]+\s+\d+\.\s+/.test(result)) {
+    // Split by numbered pattern and rebuild as block list
+    const parts = result.split(/(\d+\.\s+)/);
+    let inList = false;
+    let listItems: string[] = [];
+    let beforeList = '';
+    let afterList = '';
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const nextPart = parts[i + 1];
+
+      // Check if this is a number marker (e.g., "1. ", "2. ")
+      if (/^\d+\.\s+$/.test(part) && nextPart !== undefined) {
+        if (!inList) {
+          // Starting a list - everything before is preamble
+          beforeList = listItems.join('');
+          listItems = [];
+          inList = true;
+        }
+        // Get the content after this number (next part)
+        const itemContent = nextPart.trim();
+        if (itemContent) {
+          listItems.push(part.trim() + ' ' + itemContent);
+        }
+        i++; // Skip the content part we just consumed
+      } else if (!inList) {
+        // Before any list
+        listItems.push(part);
+      } else {
+        // After list items - could be trailing content
+        afterList += part;
+      }
+    }
+
+    if (listItems.length > 1) {
+      // Rebuild with newlines between items
+      result = beforeList.trim();
+      if (result) result += '\n\n';
+      result += listItems.join('\n');
+      if (afterList.trim()) result += '\n\n' + afterList.trim();
+    }
+  }
+
+  // Convert inline bullet lists: "* Item * Item" (asterisks only, not dashes)
+  // Dashes are commonly used in prose (e.g., "handle - like") and shouldn't be converted
+  // Only match asterisks that appear inline without newlines
+  if (/\*\s+[^\n]+\s+\*\s+/.test(result)) {
+    // Split by asterisk bullet pattern and rebuild as block list
+    const parts = result.split(/\s+(\*)\s+/);
+    if (parts.length > 2) {
+      let newContent = parts[0].trim(); // Text before first bullet
+      const items: string[] = [];
+
+      for (let i = 1; i < parts.length; i += 2) {
+        const marker = parts[i];
+        const itemText = parts[i + 1]?.trim();
+        if (marker && itemText) {
+          items.push(`${marker} ${itemText}`);
+        }
+      }
+
+      if (items.length > 1) {
+        if (newContent) newContent += '\n\n';
+        result = newContent + items.join('\n');
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Extract file names from code blocks and create a summary message
  * Also removes code blocks from display since files are shown in the Files panel
  */
@@ -75,14 +167,17 @@ function processAssistantContent(content: string, showCode: boolean): string {
       .trim();
   }
 
+  // Apply inline list conversion to fix Claude's tendency to output inline lists
+  cleanContent = convertInlineLists(cleanContent || content);
+
   // If showCode is true, return whatever content we have
   if (showCode) {
-    return cleanContent || content;
+    return cleanContent;
   }
 
   // If no files found, just return clean content
   if (uniqueFilenames.length === 0) {
-    return cleanContent || content;
+    return cleanContent;
   }
 
   // Determine what kind of files are being created
@@ -162,8 +257,10 @@ export function MessageBubble({
     ? preprocessMarkdown(message.content)
     : processAssistantContent(message.content, showCodeBlocks);
 
-  // Get agent config for styling (only for assistant messages with agentType)
-  const agentConfig = !isUser && message.agentType ? AGENT_CONFIG[message.agentType] : null;
+  // Get agent config for styling (for all assistant messages)
+  // Default to 'product_manager' (Root) for assistant messages without explicit agentType
+  const effectiveAgentType = !isUser ? (message.agentType || 'product_manager') : null;
+  const agentConfig = effectiveAgentType ? AGENT_CONFIG[effectiveAgentType] : null;
 
   // Build style object for agent left border
   const bubbleStyle = agentConfig
@@ -184,9 +281,9 @@ export function MessageBubble({
         }`}
         style={bubbleStyle}
       >
-        {/* Agent header for assistant messages with agentType */}
-        {!isUser && message.agentType && !isStreaming && (
-          <AgentHeader agentType={message.agentType} showBadge={showBadge} />
+        {/* Agent header for all assistant messages */}
+        {!isUser && effectiveAgentType && !isStreaming && (
+          <AgentHeader agentType={effectiveAgentType} showBadge={showBadge} />
         )}
 
         {/* Streaming state: show generating message with expandable raw content */}
@@ -225,7 +322,7 @@ export function MessageBubble({
           <>
             <div className={`prose prose-sm max-w-none break-words ${
               isUser
-                ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white'
+                ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
                 : 'prose-gray'
             }`}>
               <ReactMarkdown

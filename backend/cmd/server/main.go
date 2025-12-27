@@ -54,6 +54,7 @@ func main() {
 	fileRepo := repository.NewPostgresFileRepository(db)
 	fileMetadataRepo := repository.NewPostgresFileMetadataRepository(db)
 	discoveryRepo := repository.NewPostgresDiscoveryRepository(db)
+	achievementRepo := repository.NewAchievementRepository(db)
 
 	// Initialize Claude service (real or mock)
 	var claudeService service.ClaudeMessenger
@@ -78,10 +79,16 @@ func main() {
 
 	// Initialize discovery service
 	discoveryService := service.NewDiscoveryService(discoveryRepo, projectRepo, logger)
-	discoveryService.SetPRDService(prdService) // Wire PRD generation trigger
+	discoveryService.SetPRDService(prdService)      // Wire PRD generation trigger
+	discoveryService.SetMessageCreator(projectRepo) // Wire message creation for welcome messages
+	discoveryService.SetClaudeService(claudeService) // Wire Claude for generating welcome messages
 
 	// Initialize agent context service
 	agentContextService := service.NewAgentContextService(prdRepo, projectRepo, discoveryRepo, logger)
+
+	// Initialize achievement services (Phase 3: Learning Journey)
+	achievementSvc := service.NewAchievementService(achievementRepo, logger)
+	nudgeSvc := service.NewNudgeService(achievementRepo, achievementSvc, logger)
 
 	// Initialize chat service
 	chatService := service.NewChatService(service.ChatConfig{
@@ -94,6 +101,7 @@ func main() {
 	fileHandler := handler.NewFileHandler(fileRepo, projectRepo, fileMetadataRepo)
 	discoveryHandler := handler.NewDiscoveryHandler(discoveryService, logger)
 	prdHandler := handler.NewPRDHandler(prdService, logger)
+	achievementHandler := handler.NewAchievementHandler(achievementSvc, nudgeSvc, logger)
 	wsHandler := handler.NewWebSocketHandler(chatService, logger)
 
 	// Set up Gin
@@ -133,6 +141,7 @@ func main() {
 			projects.POST("/:id/discovery/users", discoveryHandler.AddUser)
 			projects.POST("/:id/discovery/features", discoveryHandler.AddFeature)
 			projects.POST("/:id/discovery/confirm", discoveryHandler.ConfirmDiscovery)
+			projects.POST("/:id/discovery/skip", discoveryHandler.SkipDiscovery)
 			projects.DELETE("/:id/discovery", discoveryHandler.ResetDiscovery)
 
 			// PRD routes (project-scoped)
@@ -154,6 +163,9 @@ func main() {
 			prds.PUT("/:id/status", prdHandler.UpdatePRDStatus)
 			prds.POST("/:id/retry", prdHandler.RetryPRDGeneration)
 		}
+
+		// Achievement routes (Phase 3: Learning Journey)
+		achievementHandler.RegisterRoutes(api)
 	}
 
 	// WebSocket endpoint

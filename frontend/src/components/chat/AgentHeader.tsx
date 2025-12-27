@@ -25,6 +25,15 @@ export function AgentHeader({
 }: AgentHeaderProps) {
   const config = AGENT_CONFIG[agentType];
 
+  // Fallback for unknown agent types
+  if (!config) {
+    return (
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-gray-600">Assistant</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2 mb-2">
       {/* Agent icon */}

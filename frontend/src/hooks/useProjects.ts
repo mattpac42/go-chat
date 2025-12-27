@@ -214,6 +214,8 @@ export function useProject(projectId: string, projects?: Project[]): UseProjectR
     fetchProject();
   }, [fetchProject]);
 
+  // Note: Polling removed - welcome message fetch is now user-initiated via CTA button
+
   return {
     project,
     messages,

@@ -234,28 +234,65 @@ func (m *MockClaudeService) determineFixtureKey(systemPrompt string, messages []
 		return "generic_response"
 	}
 
-	// Determine fixture based on current stage and conversation context
-	switch m.currentStage {
+	// Detect stage from system prompt - this is more reliable than internal state
+	// because the mock service is a singleton and may have stale state from previous projects
+	promptLower := strings.ToLower(systemPrompt)
+	detectedStage := m.currentStage
+	if strings.Contains(promptLower, "current stage: welcome") {
+		detectedStage = StageWelcome
+		// Only reset if we're coming from a later stage (stale state from previous project)
+		// Don't reset if we're already at welcome stage to avoid duplicate welcome messages
+		if m.currentStage != StageWelcome {
+			m.currentStage = StageWelcome
+			m.messageCount = 0
+		}
+	} else if strings.Contains(promptLower, "current stage: problem") {
+		detectedStage = StageProblem
+		m.currentStage = StageProblem
+	} else if strings.Contains(promptLower, "current stage: personas") {
+		detectedStage = StagePersonas
+		m.currentStage = StagePersonas
+	} else if strings.Contains(promptLower, "current stage: mvp") {
+		detectedStage = StageMVP
+		m.currentStage = StageMVP
+	} else if strings.Contains(promptLower, "current stage: summary") {
+		detectedStage = StageSummary
+		m.currentStage = StageSummary
+	}
+
+	// Check if conversation already has assistant messages (welcome already sent)
+	hasAssistantMessages := m.hasAssistantMessages(messages)
+
+	// Count assistant messages in current stage to determine fixture progression
+	stageResponseCount := m.countAssistantMessagesInStage(messages, detectedStage)
+
+	// Determine fixture based on detected stage and how many responses we've given in this stage
+	switch detectedStage {
 	case StageWelcome:
-		return "welcome_response"
+		// Only return welcome if no assistant messages exist yet
+		if !hasAssistantMessages {
+			return "welcome_response"
+		}
+		// After welcome, user's response should trigger problem stage questions
+		return "problem_response"
 
 	case StageProblem:
-		// Check if this is initial or follow-up
-		if m.messageCount <= 2 {
+		// First response in problem stage, or no problem responses yet
+		if stageResponseCount == 0 {
 			return "problem_response"
 		}
 		return "problem_followup_response"
 
 	case StagePersonas:
-		if m.messageCount <= 4 {
+		if stageResponseCount == 0 {
 			return "personas_response"
 		}
 		return "personas_followup_response"
 
 	case StageMVP:
-		if m.messageCount <= 6 {
+		if stageResponseCount == 0 {
 			return "mvp_response"
-		} else if m.messageCount <= 8 {
+		} else if stageResponseCount == 1 {
 			return "mvp_followup_response"
 		}
 		return "mvp_confirm_response"
@@ -264,9 +301,11 @@ func (m *MockClaudeService) determineFixtureKey(systemPrompt string, messages []
 		if m.isConfirmationMessage(messages) {
 			return "complete_response"
 		}
-		if m.messageCount <= 10 {
+		// First response in summary shows the summary
+		if stageResponseCount == 0 {
 			return "summary_response"
 		}
+		// Follow-up responses ask for confirmation
 		return "summary_confirm_response"
 
 	case StageComplete:
@@ -275,6 +314,67 @@ func (m *MockClaudeService) determineFixtureKey(systemPrompt string, messages []
 	default:
 		return fmt.Sprintf("%s_response", m.currentStage)
 	}
+}
+
+// hasAssistantMessages checks if the conversation already has assistant messages.
+func (m *MockClaudeService) hasAssistantMessages(messages []ClaudeMessage) bool {
+	for _, msg := range messages {
+		if msg.Role == "assistant" {
+			return true
+		}
+	}
+	return false
+}
+
+// countUserMessages counts the number of user messages in the conversation.
+func (m *MockClaudeService) countUserMessages(messages []ClaudeMessage) int {
+	count := 0
+	for _, msg := range messages {
+		if msg.Role == "user" {
+			count++
+		}
+	}
+	return count
+}
+
+// countAssistantMessagesInStage counts assistant messages that belong to the current stage.
+// This looks at the content to determine which stage a response belongs to.
+func (m *MockClaudeService) countAssistantMessagesInStage(messages []ClaudeMessage, stage DiscoveryStage) int {
+	count := 0
+	for _, msg := range messages {
+		if msg.Role == "assistant" {
+			// Check if this message belongs to the current stage based on content patterns
+			content := strings.ToLower(msg.Content)
+			switch stage {
+			case StageWelcome:
+				if strings.Contains(content, "welcome") || strings.Contains(content, "tell me a bit about yourself") {
+					count++
+				}
+			case StageProblem:
+				if strings.Contains(content, "challenge") || strings.Contains(content, "headache") ||
+					strings.Contains(content, "perfect day") {
+					count++
+				}
+			case StagePersonas:
+				if strings.Contains(content, "who will actually use") || strings.Contains(content, "who else needs access") ||
+					strings.Contains(content, "three people total") || strings.Contains(content, "employees") {
+					count++
+				}
+			case StageMVP:
+				if strings.Contains(content, "features") || strings.Contains(content, "priorities") ||
+					strings.Contains(content, "essential") || strings.Contains(content, "three things") ||
+					strings.Contains(content, "version 1") || strings.Contains(content, "version 2") {
+					count++
+				}
+			case StageSummary:
+				if strings.Contains(content, "here's what we're going to build") ||
+					strings.Contains(content, "does this capture") {
+					count++
+				}
+			}
+		}
+	}
+	return count
 }
 
 // isConfirmationMessage checks if the last user message is a confirmation.
@@ -315,15 +415,17 @@ func (m *MockClaudeService) createMockStream(response string) *ClaudeStream {
 		defer close(stream.chunks)
 		defer close(stream.done)
 
-		// Simulate streaming by sending response in chunks
-		words := strings.Fields(response)
-		for i, word := range words {
-			if i > 0 {
-				stream.chunks <- " "
+		// Stream response preserving formatting (newlines, etc.)
+		// Split into chunks of ~20 chars to simulate streaming while preserving structure
+		chunkSize := 20
+		for i := 0; i < len(response); i += chunkSize {
+			end := i + chunkSize
+			if end > len(response) {
+				end = len(response)
 			}
-			stream.chunks <- word
+			stream.chunks <- response[i:end]
 
-			// Small delay to simulate streaming (optional, can be removed for faster tests)
+			// Small delay to simulate streaming
 			time.Sleep(5 * time.Millisecond)
 		}
 	}()

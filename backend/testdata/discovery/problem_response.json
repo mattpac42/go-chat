@@ -2,8 +2,8 @@
   "stage": "problem",
   "response": "A custom cake bakery - that sounds creative!\n\nWhat's the biggest challenge you face running this day-to-day? What takes up the most time or causes the most headaches?",
   "metadata": {
-    "stage_complete": false,
-    "next_stage": "personas",
+    "stage_complete": true,
+    "next_stage": "problem",
     "extracted": {
       "business_context": "Custom cake bakery that does custom cake orders"
     }

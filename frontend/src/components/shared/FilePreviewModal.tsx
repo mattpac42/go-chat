@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { FileWithContent } from '@/types';
+import { useCodeZoom } from '@/hooks/useCodeZoom';
+import { ZoomControls } from '@/components/projects/ZoomControls';
 
 interface FilePreviewModalProps {
   file: FileWithContent | null;
@@ -66,6 +68,7 @@ function CloseIcon({ className }: { className?: string }) {
 export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProps) {
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const { zoomLevel, setZoom, getZoomStyle } = useCodeZoom();
 
   // Check for mobile viewport
   useEffect(() => {
@@ -192,9 +195,14 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
             </div>
           </div>
 
+          {/* Zoom controls */}
+          <div className="flex items-center justify-center px-4 py-2 border-b border-gray-200 bg-gray-50">
+            <ZoomControls zoomLevel={zoomLevel} onZoomChange={setZoom} />
+          </div>
+
           {/* Code content */}
-          <div className="overflow-auto p-4 h-[calc(80vh-100px)] bg-teal-50">
-            <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words">
+          <div className="overflow-auto p-4 h-[calc(80vh-140px)] bg-teal-50">
+            <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words" style={getZoomStyle()}>
               {file.content}
             </pre>
           </div>
@@ -230,6 +238,7 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
                 {file.functionalGroup}
               </span>
             )}
+            <ZoomControls zoomLevel={zoomLevel} onZoomChange={setZoom} />
             <button
               onClick={handleCopy}
               className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 transition-colors"
@@ -258,7 +267,7 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
 
         {/* Code content */}
         <div className="flex-1 overflow-auto p-6 bg-teal-50">
-          <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+          <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap break-words" style={getZoomStyle()}>
             {file.content}
           </pre>
         </div>

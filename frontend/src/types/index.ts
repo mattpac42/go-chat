@@ -5,7 +5,9 @@ export * from './discovery';
 export * from './achievements';
 
 // Agent types for multi-agent chat UI
-export type AgentType = 'product_manager' | 'designer' | 'developer';
+// Note: 'product' is a legacy alias for 'product_manager' - kept for backward compatibility
+// The 'product_manager' type is displayed as "Root" (the discovery/foundation agent)
+export type AgentType = 'product_manager' | 'product' | 'designer' | 'developer';
 
 export const AGENT_CONFIG: Record<AgentType, {
   displayName: string;
@@ -13,9 +15,10 @@ export const AGENT_CONFIG: Record<AgentType, {
   color: string;
   bgColor: string;
 }> = {
-  product_manager: { displayName: 'Product Guide', shortName: 'Guide', color: '#7C3AED', bgColor: '#F3E8FF' },
-  designer: { displayName: 'UX Expert', shortName: 'UX', color: '#F97316', bgColor: '#FFF7ED' },
-  developer: { displayName: 'Developer', shortName: 'Dev', color: '#10B981', bgColor: '#ECFDF5' },
+  product_manager: { displayName: 'Root', shortName: 'Root', color: '#0D9488', bgColor: '#CCFBF1' }, // Teal - discovery/foundation
+  product: { displayName: 'Root', shortName: 'Root', color: '#0D9488', bgColor: '#CCFBF1' }, // Legacy alias
+  designer: { displayName: 'Bloom', shortName: 'Bloom', color: '#F97316', bgColor: '#FFF7ED' }, // Orange - ideas flourish into designs
+  developer: { displayName: 'Harvest', shortName: 'Harvest', color: '#10B981', bgColor: '#ECFDF5' }, // Green - bringing ideas to fruition
 };
 
 // Project types

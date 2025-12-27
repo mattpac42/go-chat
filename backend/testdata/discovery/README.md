@@ -7,7 +7,7 @@ This directory contains JSON fixtures for testing the guided discovery flow with
 Based on the bakery/cake order manager example from the UX design document.
 
 ### Stage 1: Welcome
-- `welcome_response.json` - Product Guide's initial welcome message
+- `welcome_response.json` - Root's initial welcome message
 
 ### Stage 2: Problem Discovery
 - `problem_response.json` - Response after user describes their business

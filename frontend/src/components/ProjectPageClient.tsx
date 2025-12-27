@@ -20,6 +20,7 @@ export function ProjectPageClient() {
   const {
     projects,
     isLoading: isLoadingProjects,
+    fetchProjects,
     createProject,
     renameProject,
     deleteProject,
@@ -30,6 +31,7 @@ export function ProjectPageClient() {
     messages: initialMessages,
     isLoading: isLoadingProject,
     error: projectError,
+    fetchProject,
   } = useProject(projectId, projects);
 
   const {
@@ -238,6 +240,8 @@ export function ProjectPageClient() {
             initialMessages={initialMessages}
             onMenuClick={handleMenuClick}
             onStreamingComplete={fetchFiles}
+            onDiscoveryConfirmed={fetchProjects}
+            onRefetchMessages={fetchProject}
           />
         )}
       </main>

@@ -20,13 +20,22 @@ type PRDGenerator interface {
 	GenerateAllPRDs(ctx context.Context, discoveryID uuid.UUID) error
 }
 
+// MessageCreator defines the interface for creating messages in a project.
+// This allows DiscoveryService to create welcome messages without depending on the full repository.
+type MessageCreator interface {
+	CreateMessageWithAgent(ctx context.Context, projectID uuid.UUID, role model.Role, content string, agentType *string) (*model.Message, error)
+	GetMessages(ctx context.Context, projectID uuid.UUID) ([]model.Message, error)
+}
+
 // DiscoveryService orchestrates the discovery flow.
 type DiscoveryService struct {
-	repo          repository.DiscoveryRepository
-	projectRepo   repository.ProjectRepository
-	prdService    PRDGenerator
-	promptBuilder *prompts.DiscoveryPromptBuilder
-	logger        zerolog.Logger
+	repo           repository.DiscoveryRepository
+	projectRepo    repository.ProjectRepository
+	messageCreator MessageCreator
+	claudeService  ClaudeMessenger
+	prdService     PRDGenerator
+	promptBuilder  *prompts.DiscoveryPromptBuilder
+	logger         zerolog.Logger
 }
 
 // NewDiscoveryService creates a new DiscoveryService.
@@ -45,6 +54,18 @@ func (s *DiscoveryService) SetPRDService(prdService PRDGenerator) {
 	s.prdService = prdService
 }
 
+// SetMessageCreator sets the message creator for generating welcome messages.
+// This is optional - if not set, welcome messages will not be generated automatically.
+func (s *DiscoveryService) SetMessageCreator(messageCreator MessageCreator) {
+	s.messageCreator = messageCreator
+}
+
+// SetClaudeService sets the Claude service for generating welcome messages.
+// This is optional - if not set, welcome messages will not be generated automatically.
+func (s *DiscoveryService) SetClaudeService(claudeService ClaudeMessenger) {
+	s.claudeService = claudeService
+}
+
 // ErrInvalidStageTransition is returned when attempting an invalid stage transition.
 var ErrInvalidStageTransition = errors.New("invalid stage transition")
 
@@ -55,6 +76,8 @@ var ErrDiscoveryNotFound = errors.New("discovery not found")
 var ErrDiscoveryAlreadyComplete = errors.New("discovery is already complete")
 
 // GetOrCreateDiscovery returns an existing discovery for the project or creates a new one.
+// When creating a new discovery, it also triggers welcome message generation asynchronously.
+// For existing discoveries in welcome stage, it also ensures a welcome message exists.
 func (s *DiscoveryService) GetOrCreateDiscovery(ctx context.Context, projectID uuid.UUID) (*model.ProjectDiscovery, error) {
 	s.logger.Debug().
 		Str("projectId", projectID.String()).
@@ -63,6 +86,13 @@ func (s *DiscoveryService) GetOrCreateDiscovery(ctx context.Context, projectID u
 	// Try to get existing discovery
 	discovery, err := s.repo.GetByProjectID(ctx, projectID)
 	if err == nil {
+		// For existing discoveries in welcome stage, ensure welcome message exists
+		// Do this synchronously so the frontend can load messages immediately
+		if discovery.Stage == model.StageWelcome {
+			if _, err := s.GenerateWelcomeMessage(ctx, projectID); err != nil {
+				s.logger.Warn().Err(err).Str("projectId", projectID.String()).Msg("failed to generate welcome message")
+			}
+		}
 		return discovery, nil
 	}
 
@@ -76,6 +106,12 @@ func (s *DiscoveryService) GetOrCreateDiscovery(ctx context.Context, projectID u
 		if err != nil {
 			return nil, err
 		}
+
+		// Generate welcome message synchronously so frontend can load it immediately
+		if _, err := s.GenerateWelcomeMessage(ctx, projectID); err != nil {
+			s.logger.Warn().Err(err).Str("projectId", projectID.String()).Msg("failed to generate welcome message")
+		}
+
 		return discovery, nil
 	}
 
@@ -255,6 +291,11 @@ func (s *DiscoveryService) ConfirmDiscovery(ctx context.Context, discoveryID uui
 		return nil, err
 	}
 
+	// Rename the project using discovered name
+	if s.projectRepo != nil {
+		s.renameProjectFromDiscovery(ctx, discovery)
+	}
+
 	// Trigger async PRD generation if PRD service is configured
 	if s.prdService != nil {
 		go func() {
@@ -262,6 +303,35 @@ func (s *DiscoveryService) ConfirmDiscovery(ctx context.Context, discoveryID uui
 				s.logger.Error().Err(err).Str("discoveryId", discoveryID.String()).Msg("failed to generate PRDs")
 			}
 		}()
+	}
+
+	return result, nil
+}
+
+// SkipDiscovery skips the discovery flow for returning users.
+// It marks the discovery as complete without requiring all stages to be completed.
+func (s *DiscoveryService) SkipDiscovery(ctx context.Context, discoveryID uuid.UUID) (*model.ProjectDiscovery, error) {
+	discovery, err := s.repo.GetByID(ctx, discoveryID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrDiscoveryNotFound
+		}
+		return nil, err
+	}
+
+	if discovery.Stage.IsComplete() {
+		return nil, ErrDiscoveryAlreadyComplete
+	}
+
+	s.logger.Info().
+		Str("discoveryId", discoveryID.String()).
+		Str("currentStage", string(discovery.Stage)).
+		Msg("skipping discovery")
+
+	// Mark discovery as complete directly
+	result, err := s.repo.MarkComplete(ctx, discoveryID)
+	if err != nil {
+		return nil, err
 	}
 
 	return result, nil
@@ -671,8 +741,12 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 		}
 	}
 
-	// Extract and save users
-	if usersRaw, ok := extracted["users"].([]interface{}); ok {
+	// Extract and save users (clear existing first to avoid duplicates)
+	if usersRaw, ok := extracted["users"].([]interface{}); ok && len(usersRaw) > 0 {
+		// Clear existing users before adding new ones
+		if err := s.repo.ClearUsers(ctx, discovery.ID); err != nil {
+			s.logger.Warn().Err(err).Msg("failed to clear existing users")
+		}
 		for _, u := range usersRaw {
 			if userMap, ok := u.(map[string]interface{}); ok {
 				user := &model.DiscoveryUser{
@@ -784,4 +858,128 @@ func (s *DiscoveryService) GetDiscoveryStage(ctx context.Context, projectID uuid
 		return "", err
 	}
 	return discovery.Stage, nil
+}
+
+// HasWelcomeMessage checks if a welcome message already exists for the project.
+func (s *DiscoveryService) HasWelcomeMessage(ctx context.Context, projectID uuid.UUID) (bool, error) {
+	if s.messageCreator == nil {
+		return false, nil
+	}
+
+	messages, err := s.messageCreator.GetMessages(ctx, projectID)
+	if err != nil {
+		return false, err
+	}
+
+	return len(messages) > 0, nil
+}
+
+// GenerateWelcomeMessage generates and saves Root's welcome message.
+// This should be called when a new discovery is created.
+// Returns the generated message or nil if generation is not configured.
+func (s *DiscoveryService) GenerateWelcomeMessage(ctx context.Context, projectID uuid.UUID) (*model.Message, error) {
+	// Check if we have the required services configured
+	if s.claudeService == nil || s.messageCreator == nil {
+		s.logger.Debug().
+			Str("projectId", projectID.String()).
+			Bool("hasClaudeService", s.claudeService != nil).
+			Bool("hasMessageCreator", s.messageCreator != nil).
+			Msg("welcome message generation skipped - services not configured")
+		return nil, nil
+	}
+
+	// Check if a welcome message already exists
+	hasMessage, err := s.HasWelcomeMessage(ctx, projectID)
+	if err != nil {
+		s.logger.Warn().
+			Err(err).
+			Str("projectId", projectID.String()).
+			Msg("failed to check for existing welcome message")
+		// Continue anyway - better to risk duplicate than no message
+	}
+	if hasMessage {
+		s.logger.Debug().
+			Str("projectId", projectID.String()).
+			Msg("welcome message already exists, skipping generation")
+		return nil, nil
+	}
+
+	// Get the welcome stage system prompt
+	systemPrompt := s.promptBuilder.Build(model.StageWelcome, nil)
+
+	s.logger.Debug().
+		Str("projectId", projectID.String()).
+		Msg("generating welcome message")
+
+	// Create a trigger message to prompt Claude to generate the welcome
+	triggerMessages := []ClaudeMessage{
+		{
+			Role:    "user",
+			Content: "Please greet me and start the discovery process.",
+		},
+	}
+
+	// Call Claude to generate the welcome message
+	stream, err := s.claudeService.SendMessage(ctx, systemPrompt, triggerMessages)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	// Collect the full response
+	var fullResponse strings.Builder
+	for chunk := range stream.Chunks() {
+		fullResponse.WriteString(chunk)
+	}
+
+	if err := stream.Err(); err != nil {
+		return nil, err
+	}
+
+	responseContent := fullResponse.String()
+
+	// Strip any discovery metadata from the response
+	responseContent = StripMetadata(responseContent)
+
+	// Save the welcome message with agentType='product_manager' (matches frontend AGENT_CONFIG)
+	agentType := "product_manager"
+	message, err := s.messageCreator.CreateMessageWithAgent(ctx, projectID, model.RoleAssistant, responseContent, &agentType)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Info().
+		Str("projectId", projectID.String()).
+		Str("messageId", message.ID.String()).
+		Int("contentLength", len(responseContent)).
+		Msg("generated and saved welcome message")
+
+	return message, nil
+}
+
+// EnsureWelcomeMessage ensures that a welcome message exists for a project in discovery mode.
+// This is idempotent - if a message already exists, it does nothing.
+// This is called asynchronously to avoid blocking the discovery creation.
+func (s *DiscoveryService) EnsureWelcomeMessage(ctx context.Context, projectID uuid.UUID) {
+	s.logger.Debug().
+		Str("projectId", projectID.String()).
+		Msg("ensuring welcome message exists")
+
+	// Run in a goroutine to not block the caller
+	// Use a background context since the original request context may be cancelled
+	go func() {
+		bgCtx := context.Background()
+		msg, err := s.GenerateWelcomeMessage(bgCtx, projectID)
+		if err != nil {
+			s.logger.Error().
+				Err(err).
+				Str("projectId", projectID.String()).
+				Msg("failed to generate welcome message")
+		} else if msg != nil {
+			s.logger.Info().
+				Str("projectId", projectID.String()).
+				Str("messageId", msg.ID.String()).
+				Msg("welcome message generated successfully")
+		}
+	}()
 }

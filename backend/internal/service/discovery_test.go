@@ -127,7 +127,7 @@ func TestGetSystemPrompt_ReturnsStageAppropriatePrompt(t *testing.T) {
 	prompt, err := service.GetSystemPrompt(ctx, projectID)
 	require.NoError(t, err)
 	assert.Contains(t, prompt, "Welcome (1 of 5)")
-	assert.Contains(t, prompt, "Product Guide")
+	assert.Contains(t, prompt, "Root")
 }
 
 func TestGetSystemPrompt_ReturnsEmptyForComplete(t *testing.T) {
@@ -619,4 +619,227 @@ func TestStripMetadata_NoMetadata(t *testing.T) {
 	input := `Hello world! No metadata here.`
 	result := StripMetadata(input)
 	assert.Equal(t, input, result)
+}
+
+// MockMessageCreator is a mock implementation of MessageCreator for testing.
+type MockMessageCreator struct {
+	messages    []model.Message
+	createError error
+}
+
+func NewMockMessageCreator() *MockMessageCreator {
+	return &MockMessageCreator{
+		messages: make([]model.Message, 0),
+	}
+}
+
+func (m *MockMessageCreator) CreateMessageWithAgent(ctx context.Context, projectID uuid.UUID, role model.Role, content string, agentType *string) (*model.Message, error) {
+	if m.createError != nil {
+		return nil, m.createError
+	}
+	msg := model.Message{
+		ID:        uuid.New(),
+		ProjectID: projectID,
+		Role:      role,
+		Content:   content,
+		AgentType: agentType,
+		CreatedAt: time.Now(),
+	}
+	m.messages = append(m.messages, msg)
+	return &msg, nil
+}
+
+func (m *MockMessageCreator) GetMessages(ctx context.Context, projectID uuid.UUID) ([]model.Message, error) {
+	result := make([]model.Message, 0)
+	for _, msg := range m.messages {
+		if msg.ProjectID == projectID {
+			result = append(result, msg)
+		}
+	}
+	return result, nil
+}
+
+func (m *MockMessageCreator) Reset() {
+	m.messages = make([]model.Message, 0)
+}
+
+func TestHasWelcomeMessage_NoMessages(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	service.SetMessageCreator(mockMsgCreator)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	hasMessage, err := service.HasWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	assert.False(t, hasMessage)
+}
+
+func TestHasWelcomeMessage_WithMessages(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	service.SetMessageCreator(mockMsgCreator)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Add a message
+	agentType := "product"
+	mockMsgCreator.CreateMessageWithAgent(ctx, projectID, model.RoleAssistant, "Welcome!", &agentType)
+
+	hasMessage, err := service.HasWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	assert.True(t, hasMessage)
+}
+
+func TestHasWelcomeMessage_NoMessageCreator(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Without message creator configured, should return false without error
+	hasMessage, err := service.HasWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	assert.False(t, hasMessage)
+}
+
+func TestGenerateWelcomeMessage_NotConfigured(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Without Claude and message creator configured, should return nil without error
+	msg, err := service.GenerateWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	assert.Nil(t, msg)
+}
+
+func TestGenerateWelcomeMessage_AlreadyExists(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	mockClaude := NewMockClaudeServiceSimple()
+	service.SetMessageCreator(mockMsgCreator)
+	service.SetClaudeService(mockClaude)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Pre-add a message
+	agentType := "product"
+	mockMsgCreator.CreateMessageWithAgent(ctx, projectID, model.RoleAssistant, "Existing message", &agentType)
+
+	// Should skip generation because message already exists
+	msg, err := service.GenerateWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	assert.Nil(t, msg)
+
+	// Should still have only the original message
+	messages, _ := mockMsgCreator.GetMessages(ctx, projectID)
+	assert.Len(t, messages, 1)
+	assert.Equal(t, "Existing message", messages[0].Content)
+}
+
+func TestGenerateWelcomeMessage_Success(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	mockClaude := NewMockClaudeServiceSimple()
+	service.SetMessageCreator(mockMsgCreator)
+	service.SetClaudeService(mockClaude)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Add a welcome response fixture
+	mockClaude.AddFixture("welcome_response", &DiscoveryFixture{
+		Stage:    StageWelcome,
+		Response: "Welcome! Tell me about yourself.",
+		Metadata: DiscoveryFixtureMetadata{
+			StageComplete: false,
+			NextStage:     "problem",
+		},
+	})
+
+	// Generate welcome message
+	msg, err := service.GenerateWelcomeMessage(ctx, projectID)
+	require.NoError(t, err)
+	require.NotNil(t, msg)
+	assert.Contains(t, msg.Content, "Welcome")
+	assert.Equal(t, model.RoleAssistant, msg.Role)
+	assert.NotNil(t, msg.AgentType)
+	assert.Equal(t, "product", *msg.AgentType)
+
+	// Verify message was saved
+	messages, _ := mockMsgCreator.GetMessages(ctx, projectID)
+	assert.Len(t, messages, 1)
+}
+
+func TestGetOrCreateDiscovery_TriggersWelcomeMessage(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	mockClaude := NewMockClaudeServiceSimple()
+	service.SetMessageCreator(mockMsgCreator)
+	service.SetClaudeService(mockClaude)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Add a welcome response fixture
+	mockClaude.AddFixture("welcome_response", &DiscoveryFixture{
+		Stage:    StageWelcome,
+		Response: "Welcome! Tell me about yourself.",
+		Metadata: DiscoveryFixtureMetadata{
+			StageComplete: false,
+			NextStage:     "problem",
+		},
+	})
+
+	// Create new discovery - should trigger async welcome message
+	discovery, err := service.GetOrCreateDiscovery(ctx, projectID)
+	require.NoError(t, err)
+	assert.NotNil(t, discovery)
+	assert.Equal(t, model.StageWelcome, discovery.Stage)
+
+	// Wait a bit for async message generation
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify welcome message was created
+	messages, _ := mockMsgCreator.GetMessages(ctx, projectID)
+	assert.Len(t, messages, 1)
+	assert.Contains(t, messages[0].Content, "Welcome")
+	assert.Equal(t, "product", *messages[0].AgentType)
+}
+
+func TestGetOrCreateDiscovery_ExistingDoesNotTriggerWelcome(t *testing.T) {
+	service, _ := newTestDiscoveryService()
+	mockMsgCreator := NewMockMessageCreator()
+	mockClaude := NewMockClaudeServiceSimple()
+	service.SetMessageCreator(mockMsgCreator)
+	service.SetClaudeService(mockClaude)
+	ctx := context.Background()
+	projectID := uuid.New()
+
+	// Add a welcome response fixture
+	mockClaude.AddFixture("welcome_response", &DiscoveryFixture{
+		Stage:    StageWelcome,
+		Response: "Welcome! Tell me about yourself.",
+		Metadata: DiscoveryFixtureMetadata{
+			StageComplete: false,
+			NextStage:     "problem",
+		},
+	})
+
+	// Create discovery first time
+	discovery1, _ := service.GetOrCreateDiscovery(ctx, projectID)
+	time.Sleep(100 * time.Millisecond)
+
+	// Clear messages to reset state
+	mockMsgCreator.Reset()
+
+	// Get existing discovery - should NOT trigger welcome message
+	discovery2, err := service.GetOrCreateDiscovery(ctx, projectID)
+	require.NoError(t, err)
+	assert.Equal(t, discovery1.ID, discovery2.ID)
+
+	// Wait a bit to make sure no async message was triggered
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify no new welcome message was created
+	messages, _ := mockMsgCreator.GetMessages(ctx, projectID)
+	assert.Len(t, messages, 0)
 }

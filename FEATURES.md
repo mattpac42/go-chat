@@ -1,6 +1,1 @@
 - auto compacting the messages, when you are creating something, so all messages for a particular task are summarized and then grouped together to show you what you did for those 50 messages, like zooming out on a high level project, or something like that
-- so instead of showing code, make that 2 levels deep, give them a shortened phrase of what the file is, therefore when creating any code, there will need to be a comment at the top with these facts about the file
-    - short description
-    - long description
-    - language
-    - anything else?

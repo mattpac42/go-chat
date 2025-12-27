@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { FileNode, FileWithContent } from '@/types';
 import { API_BASE_URL } from '@/lib/api';
+import { useCodeZoom } from '@/hooks/useCodeZoom';
+import { ZoomControls } from './ZoomControls';
 
 interface FileRevealCardProps {
   file: FileNode;
@@ -306,6 +308,7 @@ export function FileRevealCard({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const codeRef = useRef<HTMLPreElement>(null);
+  const { zoomLevel, setZoom, getZoomStyle } = useCodeZoom();
 
   // Support controlled and uncontrolled modes
   const tier = controlledTier ?? internalTier;
@@ -509,27 +512,33 @@ export function FileRevealCard({
               </span>
             </div>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCopy();
-              }}
-              disabled={!content || isLoading}
-              className="flex items-center gap-1.5 px-2 py-1 text-xs rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
-              aria-label={copied ? 'Copied!' : 'Copy code'}
-            >
-              {copied ? (
-                <>
-                  <CheckIcon className="w-3.5 h-3.5 text-green-500" />
-                  <span className="text-green-600 hidden sm:inline">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <CopyIcon className="w-3.5 h-3.5 text-gray-500" />
-                  <span className="text-gray-600 hidden sm:inline">Copy</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <ZoomControls
+                zoomLevel={zoomLevel}
+                onZoomChange={setZoom}
+              />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy();
+                }}
+                disabled={!content || isLoading}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs rounded hover:bg-gray-200 transition-colors disabled:opacity-50"
+                aria-label={copied ? 'Copied!' : 'Copy code'}
+              >
+                {copied ? (
+                  <>
+                    <CheckIcon className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-green-600 hidden sm:inline">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <CopyIcon className="w-3.5 h-3.5 text-gray-500" />
+                    <span className="text-gray-600 hidden sm:inline">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Code content area */}
@@ -546,7 +555,8 @@ export function FileRevealCard({
             ) : content ? (
               <pre
                 ref={codeRef}
-                className="text-sm font-mono text-gray-100 whitespace-pre-wrap break-words leading-relaxed"
+                className="text-sm font-mono text-gray-100 whitespace-pre-wrap break-words"
+                style={getZoomStyle()}
               >
                 {content}
               </pre>

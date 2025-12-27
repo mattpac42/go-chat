@@ -7,6 +7,11 @@ interface DiscoverySummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   summary: DiscoverySummary;
+  /** If provided, shows action buttons for pre-confirmation state */
+  onConfirm?: () => void;
+  onEdit?: () => void;
+  onStartOver?: () => void;
+  isConfirming?: boolean;
 }
 
 function CloseIcon({ className }: { className?: string }) {
@@ -52,11 +57,53 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
  * Displays the project summary in a modal overlay, accessible from the header
  * after the user clicks "Start Building".
  */
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+      />
+    </svg>
+  );
+}
+
+function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13 7l5 5m0 0l-5 5m5-5H6"
+      />
+    </svg>
+  );
+}
+
 export function DiscoverySummaryModal({
   isOpen,
   onClose,
   summary,
+  onConfirm,
+  onEdit,
+  onStartOver,
+  isConfirming = false,
 }: DiscoverySummaryModalProps) {
+  // Determine if we're in action mode (pre-confirmation) or view-only mode
+  const isActionMode = !!(onConfirm && onEdit && onStartOver);
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close on escape key
@@ -220,12 +267,54 @@ export function DiscoverySummaryModal({
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-xl">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 transition-colors"
-          >
-            Close
-          </button>
+          {isActionMode ? (
+            <div className="flex flex-col gap-3">
+              {/* Primary action */}
+              <button
+                onClick={onConfirm}
+                disabled={isConfirming}
+                className="w-full px-4 py-2.5 text-sm font-medium text-white bg-teal-500 rounded-lg hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isConfirming ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Starting...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Start Building</span>
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              {/* Secondary actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={onEdit}
+                  disabled={isConfirming}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                  <span>Edit in Chat</span>
+                </button>
+                <button
+                  onClick={onStartOver}
+                  disabled={isConfirming}
+                  className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 transition-colors disabled:opacity-50"
+                >
+                  Start Over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={onClose}
+              className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 transition-colors"
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -3,17 +3,25 @@
   "response": "Those are great priorities:\n\n1. Order list (see everything)\n2. Order form (add easily)\n3. Due dates (know what's coming)\n\nAnything else you mentioned that we should plan for in a future version? Like a calendar view, or customer tracking?",
   "metadata": {
     "stage_complete": true,
-    "next_stage": "summary",
+    "next_stage": "mvp",
     "extracted": {
       "business_context": "Custom cake bakery that does custom cake orders",
       "problem_statement": "Order tracking is chaos - uses paper and WhatsApp, things get lost",
       "goals": ["See all orders in one place", "Track order status", "Know delivery schedules"],
-      "users": {
-        "description": "Owner/baker and two employees who take orders",
-        "count": 3,
-        "has_permissions": true,
-        "permission_notes": "Employees can manage orders, owner has full access including prices and reports"
-      },
+      "users": [
+        {
+          "description": "Owner/baker",
+          "count": 1,
+          "has_permissions": true,
+          "permission_notes": "Full access including prices and reports"
+        },
+        {
+          "description": "Employees who take orders",
+          "count": 2,
+          "has_permissions": true,
+          "permission_notes": "Order management only"
+        }
+      ],
       "mvp_features": [
         {"name": "Order list view", "priority": 1},
         {"name": "Order creation form", "priority": 2},

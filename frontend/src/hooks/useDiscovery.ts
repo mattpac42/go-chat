@@ -39,6 +39,8 @@ interface UseDiscoveryReturn {
   confirmDiscovery: () => Promise<void>;
   /** Reset discovery to start over */
   resetDiscovery: () => Promise<void>;
+  /** Skip discovery for experienced users (requires backend support) */
+  skipDiscovery: () => Promise<boolean>;
   /** Refetch discovery state from API */
   refetch: () => Promise<void>;
 }
@@ -172,6 +174,54 @@ export function useDiscovery(projectId: string | null): UseDiscoveryReturn {
     }
   }, [projectId]);
 
+  /**
+   * Skip discovery for experienced users
+   * Attempts to call a skip endpoint, returns true if successful
+   * Note: Currently requires backend support for skip endpoint
+   */
+  const skipDiscovery = useCallback(async (): Promise<boolean> => {
+    if (!projectId) {
+      setError('No project ID provided');
+      return false;
+    }
+
+    setError(null);
+
+    try {
+      // Try the skip endpoint first (if backend supports it)
+      const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/discovery/skip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDiscovery(data.discovery || data);
+        if (data.summary) {
+          setSummary(data.summary);
+        }
+        return true;
+      }
+
+      // If skip endpoint doesn't exist (404), inform the user
+      if (response.status === 404) {
+        setError('Skip is not available yet. Please complete the discovery process.');
+        return false;
+      }
+
+      throw new Error(`Failed to skip discovery: ${response.statusText}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Failed to skip discovery';
+      setError(errorMessage);
+      console.error('Failed to skip discovery:', err);
+      return false;
+    }
+  }, [projectId]);
+
   // Derived state: is in discovery mode (not complete)
   const isDiscoveryMode = useMemo(() => {
     if (!discovery) return true; // New projects start in discovery
@@ -204,6 +254,7 @@ export function useDiscovery(projectId: string | null): UseDiscoveryReturn {
     error,
     confirmDiscovery,
     resetDiscovery,
+    skipDiscovery,
     refetch: fetchDiscovery,
   };
 }

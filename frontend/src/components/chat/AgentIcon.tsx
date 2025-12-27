@@ -79,10 +79,11 @@ function DeveloperIcon({ className = 'w-5 h-5' }: { className?: string }) {
  */
 export function AgentIcon({ type, className = 'w-5 h-5' }: AgentIconProps) {
   const config = AGENT_CONFIG[type];
-  const style = { color: config.color };
+  const style = { color: config?.color || '#6B7280' }; // Fallback to gray
 
   switch (type) {
     case 'product_manager':
+    case 'product': // Legacy alias
       return (
         <span style={style}>
           <ProductGuideIcon className={className} />

@@ -583,8 +583,8 @@ func TestChatService_ProcessMessage_DiscoveryMode(t *testing.T) {
 		t.Fatalf("ProcessMessage failed: %v", err)
 	}
 
-	// Verify discovery system prompt was used (should contain "Product Guide")
-	if !strings.Contains(sentSystemPrompt, "Product Guide") {
+	// Verify discovery system prompt was used (should contain "Root")
+	if !strings.Contains(sentSystemPrompt, "Root") {
 		t.Error("expected discovery system prompt to be used")
 	}
 
@@ -770,8 +770,8 @@ func TestChatService_ProcessMessage_DiscoveryCompleteUsesDefaultPrompt(t *testin
 		t.Fatalf("ProcessMessage failed: %v", err)
 	}
 
-	// Verify default system prompt was used (should contain file format requirements, not Product Guide)
-	if strings.Contains(sentSystemPrompt, "Product Guide") {
+	// Verify default system prompt was used (should contain file format requirements, not Root discovery prompt)
+	if strings.Contains(sentSystemPrompt, "You are Root, the discovery guide") {
 		t.Error("expected default system prompt after discovery complete, got discovery prompt")
 	}
 	if !strings.Contains(sentSystemPrompt, "FILE FORMAT REQUIREMENT") {

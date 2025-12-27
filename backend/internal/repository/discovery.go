@@ -39,6 +39,7 @@ type DiscoveryRepository interface {
 	AddUser(ctx context.Context, user *model.DiscoveryUser) (*model.DiscoveryUser, error)
 	GetUsers(ctx context.Context, discoveryID uuid.UUID) ([]model.DiscoveryUser, error)
 	UpdateUser(ctx context.Context, user *model.DiscoveryUser) (*model.DiscoveryUser, error)
+	ClearUsers(ctx context.Context, discoveryID uuid.UUID) error
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 
 	// Feature methods
@@ -331,6 +332,13 @@ func (r *PostgresDiscoveryRepository) DeleteUser(ctx context.Context, userID uui
 	}
 
 	return nil
+}
+
+// ClearUsers removes all users for a discovery.
+func (r *PostgresDiscoveryRepository) ClearUsers(ctx context.Context, discoveryID uuid.UUID) error {
+	query := `DELETE FROM discovery_users WHERE discovery_id = $1`
+	_, err := r.db.ExecContext(ctx, query, discoveryID)
+	return err
 }
 
 // AddFeature adds a new feature to a discovery.
@@ -749,6 +757,12 @@ func (r *MockDiscoveryRepository) DeleteUser(ctx context.Context, userID uuid.UU
 		}
 	}
 	return ErrNotFound
+}
+
+// ClearUsers removes all users for a discovery.
+func (r *MockDiscoveryRepository) ClearUsers(ctx context.Context, discoveryID uuid.UUID) error {
+	delete(r.users, discoveryID)
+	return nil
 }
 
 // AddFeature adds a new feature to a discovery.

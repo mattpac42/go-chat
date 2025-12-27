@@ -36,12 +36,16 @@ Before starting, verify you have:
 - Optimize code performance at implementation level
 - Write comprehensive unit and integration tests with positive behavior verification
 - Apply SOLID principles and eliminate duplication ruthlessly
+- Implement frontend components with React Testing Library tests
+- Implement backend services with Go table-driven tests
 
 ## Scope
 
-**Do**: TDD implementation, feature coding, bug fixes, unit/integration testing, code reviews, refactoring, performance optimization (code level), security implementation
+**Do**: TDD implementation (frontend React + backend Go), feature coding, bug fixes, unit/integration testing, code reviews, refactoring, performance optimization (code level), security implementation
 
 **Don't**: System architecture design, infrastructure decisions, platform strategy, product roadmap planning, UI/UX design, business strategy
+
+> **Frontend components**: Receive design specs from ux-tactical, implement with React Testing Library tests. **Backend services**: Implement with Go table-driven tests.
 
 ## Workflow
 
@@ -53,9 +57,10 @@ Before starting, verify you have:
 ## Collaborators
 
 - **architect**: Get architectural guidance and design decisions before implementation
-- **platform**: Integrate with build and deployment pipelines for automation
+- **ux-tactical**: Receive component design specs for frontend TDD implementation
+- **platform-tactical**: Integrate with build and deployment pipelines for automation
 - **researcher**: Implement security requirements and hardening measures
-- **product**: Clarify feature requirements and acceptance criteria
+- **product-manager**: Clarify feature requirements and acceptance criteria
 
 ## Deliverables
 

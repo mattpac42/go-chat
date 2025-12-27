@@ -361,6 +361,51 @@ func (h *DiscoveryHandler) ConfirmDiscovery(c *gin.Context) {
 	})
 }
 
+// SkipDiscovery skips the discovery flow for returning users.
+// POST /api/projects/:id/discovery/skip
+func (h *DiscoveryHandler) SkipDiscovery(c *gin.Context) {
+	projectID, err := parseProjectID(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		return
+	}
+
+	// Get current discovery
+	discovery, err := h.service.GetDiscovery(c.Request.Context(), projectID)
+	if err != nil {
+		if errors.Is(err, service.ErrDiscoveryNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "discovery not found"})
+			return
+		}
+		h.logger.Error().Err(err).Str("projectId", projectID.String()).Msg("failed to get discovery")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get discovery"})
+		return
+	}
+
+	// Skip discovery - mark as complete without going through all stages
+	updated, err := h.service.SkipDiscovery(c.Request.Context(), discovery.ID)
+	if err != nil {
+		if errors.Is(err, service.ErrDiscoveryAlreadyComplete) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "discovery is already complete"})
+			return
+		}
+		h.logger.Error().Err(err).Msg("failed to skip discovery")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to skip discovery"})
+		return
+	}
+
+	response, err := updated.ToResponse()
+	if err != nil {
+		h.logger.Error().Err(err).Msg("failed to convert discovery to response")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process discovery data"})
+		return
+	}
+
+	c.JSON(http.StatusOK, DiscoveryWithSummaryResponse{
+		Discovery: response,
+	})
+}
+
 // ResetDiscovery deletes the current discovery and starts over.
 // DELETE /api/projects/:id/discovery
 func (h *DiscoveryHandler) ResetDiscovery(c *gin.Context) {

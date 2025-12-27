@@ -10,7 +10,7 @@ import { Project } from '@/types';
 
 export function HomeClient() {
   const router = useRouter();
-  const { projects, isLoading, error, createProject, renameProject, deleteProject } = useProjects();
+  const { projects, isLoading, error, fetchProjects, createProject, renameProject, deleteProject } = useProjects();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -18,6 +18,7 @@ export function HomeClient() {
   const {
     messages: projectMessages,
     isLoading: isLoadingProject,
+    fetchProject,
   } = useProject(selectedProject?.id || '');
 
   // Select first project when projects load
@@ -149,6 +150,8 @@ export function HomeClient() {
               projectTitle={selectedProject.title}
               initialMessages={projectMessages}
               onMenuClick={handleMenuClick}
+              onDiscoveryConfirmed={fetchProjects}
+              onRefetchMessages={fetchProject}
             />
           )
         ) : (

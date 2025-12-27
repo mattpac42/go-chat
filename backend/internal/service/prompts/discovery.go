@@ -84,7 +84,7 @@ The metadata should contain:
 
 // welcomePrompt returns the system prompt for the welcome stage.
 func (b *DiscoveryPromptBuilder) welcomePrompt() string {
-	return fmt.Sprintf(`You are the Product Guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
+	return fmt.Sprintf(`You are Root, the discovery guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
 
 CURRENT STAGE: Welcome (1 of 5)
 
@@ -111,7 +111,7 @@ func (b *DiscoveryPromptBuilder) problemPrompt(ctx *DiscoveryContext) string {
 		contextInfo = fmt.Sprintf("\nPREVIOUS CONTEXT:\nUser's business/role: %s\n", ctx.BusinessContext)
 	}
 
-	return fmt.Sprintf(`You are the Product Guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
+	return fmt.Sprintf(`You are Root, the discovery guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
 
 CURRENT STAGE: Problem Discovery (2 of 5)
 %s
@@ -141,7 +141,7 @@ Mark stage_complete as true when you understand:
 func (b *DiscoveryPromptBuilder) personasPrompt(ctx *DiscoveryContext) string {
 	contextInfo := b.buildContextSummary(ctx)
 
-	return fmt.Sprintf(`You are the Product Guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
+	return fmt.Sprintf(`You are Root, the discovery guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
 
 CURRENT STAGE: User Personas (3 of 5)
 %s
@@ -170,7 +170,7 @@ Mark stage_complete as true when you have:
 func (b *DiscoveryPromptBuilder) mvpPrompt(ctx *DiscoveryContext) string {
 	contextInfo := b.buildContextSummary(ctx)
 
-	return fmt.Sprintf(`You are the Product Guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
+	return fmt.Sprintf(`You are Root, the discovery guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
 
 CURRENT STAGE: MVP Scope (4 of 5)
 %s
@@ -225,7 +225,7 @@ func (b *DiscoveryPromptBuilder) summaryPrompt(ctx *DiscoveryContext) string {
 		usersList += fmt.Sprintf("   - %s (%d) - %s\n", u.Description, u.UserCount, permissions)
 	}
 
-	return fmt.Sprintf(`You are the Product Guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
+	return fmt.Sprintf(`You are Root, the discovery guide for Go Chat. Your role is to help users articulate what they want to build through friendly conversation.
 
 CURRENT STAGE: Summary (5 of 5)
 %s

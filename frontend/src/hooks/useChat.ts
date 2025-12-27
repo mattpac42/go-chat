@@ -39,6 +39,14 @@ export function useChat({ projectId, initialMessages = [] }: UseChatOptions): Us
     error: null,
   });
 
+  // Sync initialMessages when they change (e.g., welcome message loaded after discovery)
+  // Only update if we have no messages and initialMessages has content
+  useEffect(() => {
+    if (state.messages.length === 0 && initialMessages.length > 0) {
+      setState(prev => ({ ...prev, messages: initialMessages }));
+    }
+  }, [initialMessages, state.messages.length]);
+
   // Track streaming message by ID
   const streamingMessageRef = useRef<Map<string, Message>>(new Map());
 
