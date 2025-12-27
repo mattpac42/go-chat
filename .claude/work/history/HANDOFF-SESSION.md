@@ -1,8 +1,8 @@
-# Handoff - Session 012
+# Handoff - Session 013
 
 ## Immediate Context
 
-Working on **Agent Personas & Discovery UX**. Renamed agents to Go and Grow theme (Root, Bloom, Harvest) and replaced discovery waiting spinner with user-initiated CTA button.
+Working on **Chat UI Polish & Code Viewing**. Major improvements to message display, collapsible code blocks, zoom feature, and file metadata generation.
 
 ## Branch
 
@@ -10,56 +10,55 @@ Working on **Agent Personas & Discovery UX**. Renamed agents to Go and Grow them
 
 ## Last Task
 
-Implemented user-initiated discovery flow:
-- Added "Let's solve my problem" CTA button
-- Removed automatic polling for welcome message
-- User clicks → fetch → welcome message appears
+Fixed text overflow in chat messages - changed from scrollbar to word wrap for inline code blocks.
 
 ## Critical Files to Read
 
-1. `frontend/src/components/chat/MessageList.tsx` - CTA button implementation
-2. `frontend/src/components/chat/ChatContainer.tsx` - handleStartDiscovery handler
-3. `frontend/src/types/index.ts` - Root/Bloom/Harvest agent config
-4. `backend/internal/service/agent_context.go` - Agent prompts (lines 344-417)
+1. `frontend/src/components/chat/MessageBubble.tsx` - Prose styling with word wrap
+2. `frontend/src/components/chat/CodeBlock.tsx` - Collapsible blocks + zoom
+3. `frontend/src/hooks/useCodeZoom.ts` - Zoom state management
+4. `backend/internal/service/agent_context.go` - Harvest YAML metadata format (lines 420-449)
+5. `backend/internal/handler/websocket.go` - 180s timeout, error messageId
 
 ## Changes Summary
 
-### Agent Personas (Go and Grow)
-- **Root** (teal) - Discovery/foundation agent
-- **Bloom** (orange) - Design agent
-- **Harvest** (green) - Developer agent
+### Chat UI
+- Agent colors consistent (all messages show Root label)
+- Word wrap on inline code blocks (no more overflow)
+- Collapsible code blocks with line count
+- Zoom slider 25%-150%
 
-### Agent Consolidation
-- Deleted `software-tactical.md` (was duplicate of developer)
-- Deleted `software-strategic.md` (was duplicate of architect)
+### File Metadata
+- Harvest outputs YAML front matter in code blocks
+- Format: short_description, long_description, functional_group
+- Existing files need regeneration to get metadata
 
-### Discovery UX
-- Replaced waiting spinner with CTA button
-- Button: "Let's solve my problem" with seedling icon
-- Shows "Starting..." during fetch
-- Removed polling logic from useProjects.ts
+### Backend
+- API timeout: 60s -> 180s
+- Error responses include messageId for cleanup
 
-## Git Status (Uncommitted)
+## Git Status
 
-~40+ modified files including:
-- Agent files (developer.md, ux-tactical.md, lineage.json)
-- Backend prompts and tests
-- Frontend types, components, hooks
+Branch is ahead of origin by ~8 commits. All changes committed.
 
 ## What's Next
 
-1. **Test discovery flow** - Create project, click CTA, verify welcome message
-2. **Run backend tests** - Verify Root assertions pass
-3. **Commit changes** - Large changeset ready
+1. **Push changes** - `git push` to update remote
+2. **Test file metadata** - Ask Harvest to create a file, verify descriptions saved
+3. **Test zoom on mobile** - Verify slider works with touch
+4. **Consider MR** - Large feature set ready for review
 
 ## Suggested First Action
 
-```
-1. Start servers (USE_MOCK_CLAUDE=true for backend)
-2. Create new project
-3. Click "Let's solve my problem" button
-4. Verify Root welcome message appears
-5. If working, commit all changes
+```bash
+# Push all commits to remote
+git push
+
+# Then test the file metadata feature:
+# 1. Start backend with USE_MOCK_CLAUDE=true
+# 2. Create new project
+# 3. Ask Harvest to create a file
+# 4. Check if file has longDescription in explorer
 ```
 
 ## Session History
@@ -68,3 +67,4 @@ Implemented user-initiated discovery flow:
 - SESSION-010: Discovery UI fixes, hybrid summary modal
 - SESSION-011: Bug fixes for duplicates, formatting, title updates
 - SESSION-012: Agent personas (Root/Bloom/Harvest), discovery CTA
+- SESSION-013: Chat UI polish, collapsible code, zoom, file metadata
