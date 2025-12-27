@@ -71,7 +71,7 @@ interface FolderSectionProps {
   expandedFiles: Set<string>;
   onToggleFile: (fileId: string) => void;
   getFileTier: (fileId: string) => RevealTier;
-  onCardClick: (fileId: string, hasLongDesc: boolean) => void;
+  onCardClick: (fileId: string) => void;
   onIntentionalExpand: (fileId: string, tier: RevealTier) => void;
 }
 
@@ -134,7 +134,7 @@ function FolderSection({
               file={file}
               onLoadContent={onLoadContent}
               tier={getFileTier(file.id)}
-              onCardClick={() => onCardClick(file.id, !!file.longDescription)}
+              onCardClick={() => onCardClick(file.id)}
               onIntentionalExpand={(tier) => onIntentionalExpand(file.id, tier)}
             />
           ))}
@@ -149,7 +149,7 @@ interface FunctionalGroupSectionProps {
   files: FileNode[];
   onLoadContent?: (fileId: string) => Promise<FileWithContent | null>;
   getFileTier: (fileId: string) => RevealTier;
-  onCardClick: (fileId: string, hasLongDesc: boolean) => void;
+  onCardClick: (fileId: string) => void;
   onIntentionalExpand: (fileId: string, tier: RevealTier) => void;
 }
 
@@ -201,7 +201,7 @@ function FunctionalGroupSection({
               file={file}
               onLoadContent={onLoadContent}
               tier={getFileTier(file.id)}
-              onCardClick={() => onCardClick(file.id, !!file.longDescription)}
+              onCardClick={() => onCardClick(file.id)}
               onIntentionalExpand={(tier) => onIntentionalExpand(file.id, tier)}
               hideFunctionalGroup={true}
             />
@@ -300,7 +300,7 @@ export function FileRevealList({
   }, [fileStates]);
 
   // Handle casual card click - collapse non-pinned files, toggle this file (collapsed <-> details only)
-  const handleCardClick = useCallback((fileId: string, hasLongDesc: boolean) => {
+  const handleCardClick = useCallback((fileId: string) => {
     setFileStates((prev) => {
       const next = new Map(prev);
 
@@ -313,9 +313,7 @@ export function FileRevealList({
 
       // Toggle this file's tier between collapsed and details only (not code)
       const current = prev.get(fileId)?.tier ?? 'collapsed';
-      let nextTier: RevealTier;
-      if (current === 'collapsed') nextTier = hasLongDesc ? 'details' : 'collapsed';
-      else nextTier = 'collapsed'; // from details or code -> collapsed
+      const nextTier: RevealTier = current === 'collapsed' ? 'details' : 'collapsed';
 
       next.set(fileId, { tier: nextTier, pinned: false });
       return next;
@@ -427,7 +425,7 @@ export function FileRevealList({
           file={file}
           onLoadContent={onLoadContent}
           tier={getFileTier(file.id)}
-          onCardClick={() => handleCardClick(file.id, !!file.longDescription)}
+          onCardClick={() => handleCardClick(file.id)}
           onIntentionalExpand={(tier) => handleIntentionalExpand(file.id, tier)}
         />
       ))}

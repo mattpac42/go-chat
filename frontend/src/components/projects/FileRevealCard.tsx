@@ -330,11 +330,11 @@ export function FileRevealCard({
   const getNextTierToggle = useCallback((): RevealTier => {
     // If in code view, go to collapsed
     if (tier === 'code') return 'collapsed';
-    // If collapsed, go to details (or stay collapsed if no long description)
-    if (tier === 'collapsed') return hasLongDescription ? 'details' : 'collapsed';
+    // If collapsed, go to details (always allow - shortDescription un-truncates)
+    if (tier === 'collapsed') return 'details';
     // If in details, go back to collapsed
     return 'collapsed';
-  }, [tier, hasLongDescription]);
+  }, [tier]);
 
   // Handle main card click - toggles between collapsed and details only (not code)
   const handleCardClick = useCallback(() => {
