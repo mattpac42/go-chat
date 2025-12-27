@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import { Message, AGENT_CONFIG } from '@/types';
 import { CodeBlock } from './CodeBlock';
 import { AgentHeader } from './AgentHeader';
+import { CollapsibleList } from './CollapsibleList';
+import { CollapsibleContent } from './CollapsibleContent';
 
 interface MessageBubbleProps {
   message: Message;
@@ -320,13 +322,18 @@ export function MessageBubble({
         ) : (
           /* Normal rendering for completed messages */
           <>
-            <div className={`prose prose-sm max-w-none break-words [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:max-w-full [&_code]:break-words [&_code]:whitespace-pre-wrap ${
-              isUser
-                ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
-                : 'prose-gray'
-            }`}>
-              <ReactMarkdown
-                components={{
+            <CollapsibleContent
+              paragraphThreshold={3}
+              visibleParagraphs={2}
+              isUserMessage={isUser}
+            >
+              <div className={`prose prose-sm max-w-none break-words [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:max-w-full [&_code]:break-words [&_code]:whitespace-pre-wrap ${
+                isUser
+                  ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
+                  : 'prose-gray'
+              }`}>
+                <ReactMarkdown
+                  components={{
                   // Custom code block rendering
                   code: ({ className, children, ...props }) => {
                     const match = /language-(\w+)/.exec(className || '');
@@ -390,11 +397,26 @@ export function MessageBubble({
                     <h3 className={`text-base font-bold mb-2 ${isUser ? 'text-white' : 'text-gray-900'}`}>{children}</h3>
                   ),
                   // Style lists - use list-outside with padding for proper alignment
+                  // Auto-collapse lists with more than 5 items
                   ul: ({ children }) => (
-                    <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>
+                    <CollapsibleList
+                      listType="ul"
+                      className="list-disc pl-5 mb-2 space-y-1"
+                      threshold={5}
+                      visibleCount={4}
+                    >
+                      {children}
+                    </CollapsibleList>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>
+                    <CollapsibleList
+                      listType="ol"
+                      className="list-decimal pl-5 mb-2 space-y-1"
+                      threshold={5}
+                      visibleCount={4}
+                    >
+                      {children}
+                    </CollapsibleList>
                   ),
                   // Style list items to ensure inline display of number and content
                   li: ({ children }) => (
@@ -420,10 +442,11 @@ export function MessageBubble({
                     </a>
                   ),
                 }}
-              >
-                {displayContent}
-              </ReactMarkdown>
-            </div>
+                >
+                  {displayContent}
+                </ReactMarkdown>
+              </div>
+            </CollapsibleContent>
 
             {/* Timestamp */}
             {formattedTime && (

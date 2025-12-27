@@ -78,19 +78,14 @@ export function CodeBlock({ code, language = 'text', defaultCollapsed = true }: 
         </div>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-700"
+          className="flex items-center justify-center w-7 h-7 text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-700"
           aria-label={copied ? 'Copied!' : 'Copy code'}
+          title={copied ? 'Copied!' : 'Copy code'}
         >
           {copied ? (
-            <>
-              <CheckIcon className="w-4 h-4" />
-              <span>Copied!</span>
-            </>
+            <CheckIcon className="w-4 h-4 text-green-400" />
           ) : (
-            <>
-              <CopyIcon className="w-4 h-4" />
-              <span>Copy</span>
-            </>
+            <CopyIcon className="w-4 h-4" />
           )}
         </button>
       </div>

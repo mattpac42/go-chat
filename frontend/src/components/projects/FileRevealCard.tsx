@@ -527,15 +527,9 @@ export function FileRevealCard({
                 aria-label={copied ? 'Copied!' : 'Copy code'}
               >
                 {copied ? (
-                  <>
-                    <CheckIcon className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-green-600 hidden sm:inline">Copied!</span>
-                  </>
+                  <CheckIcon className="w-3.5 h-3.5 text-green-500" />
                 ) : (
-                  <>
-                    <CopyIcon className="w-3.5 h-3.5 text-gray-500" />
-                    <span className="text-gray-600 hidden sm:inline">Copy</span>
-                  </>
+                  <CopyIcon className="w-3.5 h-3.5 text-gray-500" />
                 )}
               </button>
             </div>

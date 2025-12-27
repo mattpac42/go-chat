@@ -244,15 +244,9 @@ export function FilePreviewModal({ file, isOpen, onClose }: FilePreviewModalProp
               className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 transition-colors"
             >
               {copied ? (
-                <>
-                  <CheckIcon className="w-4 h-4 text-green-500" />
-                  <span className="text-green-600">Copied!</span>
-                </>
+                <CheckIcon className="w-4 h-4 text-green-500" />
               ) : (
-                <>
-                  <CopyIcon className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-600">Copy</span>
-                </>
+                <CopyIcon className="w-4 h-4 text-gray-500" />
               )}
             </button>
             <button
