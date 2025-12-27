@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,11 @@ import (
 // ClaudeMessenger is the interface for sending messages to Claude (real or mock).
 type ClaudeMessenger interface {
 	SendMessage(ctx context.Context, systemPrompt string, messages []ClaudeMessage) (*ClaudeStream, error)
+}
+
+// ClaudeVision is the interface for image analysis with Claude Vision.
+type ClaudeVision interface {
+	AnalyzeImage(ctx context.Context, imageData []byte, mimeType, prompt string) (string, error)
 }
 
 const (
@@ -108,6 +114,45 @@ type claudeRequest struct {
 	System    string          `json:"system"`
 	Messages  []ClaudeMessage `json:"messages"`
 	Stream    bool            `json:"stream"`
+}
+
+// claudeVisionRequest is the request body for the Claude Vision API.
+type claudeVisionRequest struct {
+	Model     string                `json:"model"`
+	MaxTokens int                   `json:"max_tokens"`
+	Messages  []claudeVisionMessage `json:"messages"`
+}
+
+// claudeVisionMessage represents a message with multimodal content.
+type claudeVisionMessage struct {
+	Role    string                       `json:"role"`
+	Content []claudeVisionMessageContent `json:"content"`
+}
+
+// claudeVisionMessageContent represents content in a Vision message.
+type claudeVisionMessageContent struct {
+	Type   string                    `json:"type"`
+	Text   string                    `json:"text,omitempty"`
+	Source *claudeVisionImageSource  `json:"source,omitempty"`
+}
+
+// claudeVisionImageSource represents an image source for Vision API.
+type claudeVisionImageSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
+// claudeVisionResponse represents a non-streaming response from Claude.
+type claudeVisionResponse struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Role    string `json:"role"`
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+	StopReason string `json:"stop_reason"`
 }
 
 // claudeErrorResponse represents an error from the Claude API.
@@ -304,4 +349,92 @@ func (s *ClaudeService) processStream(resp *http.Response, stream *ClaudeStream)
 	if err := scanner.Err(); err != nil {
 		stream.err = fmt.Errorf("stream read error: %w", err)
 	}
+}
+
+// AnalyzeImage sends an image to Claude Vision API and returns the analysis as text.
+func (s *ClaudeService) AnalyzeImage(ctx context.Context, imageData []byte, mimeType, prompt string) (string, error) {
+	// Encode image data to base64
+	base64Data := base64.StdEncoding.EncodeToString(imageData)
+
+	// Build the multimodal request
+	reqBody := claudeVisionRequest{
+		Model:     s.config.Model,
+		MaxTokens: s.config.MaxTokens,
+		Messages: []claudeVisionMessage{
+			{
+				Role: "user",
+				Content: []claudeVisionMessageContent{
+					{
+						Type: "image",
+						Source: &claudeVisionImageSource{
+							Type:      "base64",
+							MediaType: mimeType,
+							Data:      base64Data,
+						},
+					},
+					{
+						Type: "text",
+						Text: prompt,
+					},
+				},
+			},
+		},
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal vision request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.config.BaseURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create vision request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", s.config.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersion)
+
+	s.logger.Debug().
+		Str("model", s.config.Model).
+		Str("mimeType", mimeType).
+		Int("imageSize", len(imageData)).
+		Msg("sending vision request to Claude API")
+
+	// Send request
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send vision request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read vision response: %w", err)
+	}
+
+	// Check for error response
+	if resp.StatusCode != http.StatusOK {
+		var errResp claudeErrorResponse
+		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
+			return "", fmt.Errorf("Claude Vision API error: %s", errResp.Error.Message)
+		}
+		return "", fmt.Errorf("Claude Vision API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the response
+	var visionResp claudeVisionResponse
+	if err := json.Unmarshal(body, &visionResp); err != nil {
+		return "", fmt.Errorf("failed to parse vision response: %w", err)
+	}
+
+	// Extract text from the response
+	var result strings.Builder
+	for _, content := range visionResp.Content {
+		if content.Type == "text" {
+			result.WriteString(content.Text)
+		}
+	}
+
+	return result.String(), nil
 }

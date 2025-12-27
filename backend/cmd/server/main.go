@@ -53,24 +53,29 @@ func main() {
 	projectRepo := repository.NewPostgresProjectRepository(db)
 	fileRepo := repository.NewPostgresFileRepository(db)
 	fileMetadataRepo := repository.NewPostgresFileMetadataRepository(db)
+	fileSourceRepo := repository.NewPostgresFileSourceRepository(db)
 	discoveryRepo := repository.NewPostgresDiscoveryRepository(db)
 	achievementRepo := repository.NewAchievementRepository(db)
 
 	// Initialize Claude service (real or mock)
 	var claudeService service.ClaudeMessenger
+	var claudeVision service.ClaudeVision
 	if os.Getenv("USE_MOCK_CLAUDE") == "true" {
 		mockService, err := service.NewMockClaudeService("testdata/discovery")
 		if err != nil {
 			logger.Fatal().Err(err).Msg("failed to load mock fixtures")
 		}
 		claudeService = mockService
+		claudeVision = mockService // MockClaudeService also implements ClaudeVision
 		logger.Info().Msg("using MOCK Claude service (no API calls)")
 	} else {
-		claudeService = service.NewClaudeService(service.ClaudeConfig{
+		realClaudeService := service.NewClaudeService(service.ClaudeConfig{
 			APIKey:    cfg.ClaudeAPIKey,
 			Model:     cfg.ClaudeModel,
 			MaxTokens: cfg.ClaudeMaxTokens,
 		}, logger)
+		claudeService = realClaudeService
+		claudeVision = realClaudeService
 	}
 
 	// Initialize PRD repository and service
@@ -99,6 +104,7 @@ func main() {
 	healthHandler := handler.NewHealthHandler(db)
 	projectHandler := handler.NewProjectHandler(projectRepo)
 	fileHandler := handler.NewFileHandler(fileRepo, projectRepo, fileMetadataRepo)
+	uploadHandler := handler.NewUploadHandler(projectRepo, fileRepo, fileMetadataRepo, fileSourceRepo, claudeVision, logger)
 	discoveryHandler := handler.NewDiscoveryHandler(discoveryService, logger)
 	prdHandler := handler.NewPRDHandler(prdService, logger)
 	achievementHandler := handler.NewAchievementHandler(achievementSvc, nudgeSvc, logger)
@@ -133,6 +139,7 @@ func main() {
 			projects.DELETE("/:id", projectHandler.Delete)
 			projects.GET("/:id/files", fileHandler.ListFiles)
 			projects.GET("/:id/download", fileHandler.DownloadProjectZip)
+			projects.POST("/:id/upload", uploadHandler.Upload)
 
 			// Discovery routes
 			projects.GET("/:id/discovery", discoveryHandler.GetDiscovery)

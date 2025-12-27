@@ -478,3 +478,26 @@ func (m *MockClaudeService) GetStageHistory() []DiscoveryStage {
 	copy(history, m.stageHistory)
 	return history
 }
+
+// AnalyzeImage implements ClaudeVision interface for the mock service.
+// It returns a mock description of the image for testing purposes.
+func (m *MockClaudeService) AnalyzeImage(ctx context.Context, imageData []byte, mimeType, prompt string) (string, error) {
+	// Return a mock markdown description for testing
+	return fmt.Sprintf(`## Image Description
+
+This is a mock image analysis response for testing purposes.
+
+### Image Details
+- **Type**: %s
+- **Size**: %d bytes
+
+### Content
+The image contains visual content that has been analyzed by Claude Vision.
+
+### Transcribed Text
+*No text was detected in this mock analysis.*
+
+---
+*This is a mock response from MockClaudeService.AnalyzeImage*
+`, mimeType, len(imageData)), nil
+}

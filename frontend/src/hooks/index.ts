@@ -7,3 +7,6 @@ export { useAgentIntroductions } from './useAgentIntroductions';
 export { useAchievements } from './useAchievements';
 export { useCodeZoom, ZOOM_LEVELS } from './useCodeZoom';
 export type { ZoomLevel } from './useCodeZoom';
+export { useCostSavings, PM_HOURLY_RATE, DEV_HOURLY_RATE } from './useCostSavings';
+export type { SessionMetrics, CostSavingsResult } from './useCostSavings';
+export { useMessageHistory } from './useMessageHistory';

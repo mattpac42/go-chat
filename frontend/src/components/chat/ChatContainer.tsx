@@ -270,6 +270,7 @@ export function ChatContainer({
 
       {/* Input */}
       <ChatInput
+        projectId={projectId}
         onSend={sendMessage}
         disabled={connectionStatus !== 'connected' || isLoading || isWaitingForDiscoveryStart || isStartingDiscovery}
         placeholder={getPlaceholder()}

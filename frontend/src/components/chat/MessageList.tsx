@@ -148,7 +148,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
             </div>
 
             {/* Primary CTA */}
-            <div className="mt-6 ml-16">
+            <div className="mt-6">
               <button
                 onClick={onStartDiscovery}
                 disabled={isStartingDiscovery}
@@ -170,7 +170,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
 
             {/* Skip option for returning users */}
             {showSkipDiscovery && onSkipDiscovery && (
-              <div className="mt-4 pt-4 border-t border-teal-200 ml-16">
+              <div className="mt-4 pt-4 border-t border-teal-200 flex justify-center">
                 <button
                   onClick={onSkipDiscovery}
                   disabled={isStartingDiscovery}
