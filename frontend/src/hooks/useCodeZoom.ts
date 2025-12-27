@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
 const STORAGE_KEY = 'codeZoomLevel';
-const ZOOM_LEVELS = [75, 100, 125, 150] as const;
+const ZOOM_LEVELS = [25, 50, 75, 100, 125, 150] as const;
 type ZoomLevel = (typeof ZOOM_LEVELS)[number];
 
 interface UseCodeZoomReturn {
