@@ -1,70 +1,90 @@
-# Handoff - Session 013
+# Handoff - Session 014
 
 ## Immediate Context
 
-Working on **Chat UI Polish & Code Viewing**. Major improvements to message display, collapsible code blocks, zoom feature, and file metadata generation.
+Working on **Chat UX improvements & new features**. Major work on progressive disclosure, image upload, cost savings, and sidebar simplification.
 
 ## Branch
 
-`feature/discovery-app-map-seeding`
+`main` (v1.0.0 released this session)
 
-## Last Task
+## Last Tasks Completed
 
-Fixed text overflow in chat messages - changed from scrollbar to word wrap for inline code blocks.
+1. Progressive disclosure for long chat content
+2. Image upload backend with Claude Vision
+3. Clipboard paste for screenshots
+4. Up arrow message history in chat
+5. Cost savings card (integrated into summary modal)
+6. Simplified streaming (removed raw text toggle)
+7. Fixed auto-scroll during streaming
+8. Removed card view from file explorer (kept Purpose + Tree only)
 
 ## Critical Files to Read
 
-1. `frontend/src/components/chat/MessageBubble.tsx` - Prose styling with word wrap
-2. `frontend/src/components/chat/CodeBlock.tsx` - Collapsible blocks + zoom
-3. `frontend/src/hooks/useCodeZoom.ts` - Zoom state management
-4. `backend/internal/service/agent_context.go` - Harvest YAML metadata format (lines 420-449)
-5. `backend/internal/handler/websocket.go` - 180s timeout, error messageId
+1. `frontend/src/components/chat/MessageBubble.tsx` - Simplified streaming, no CollapsibleList
+2. `frontend/src/components/chat/ChatInput.tsx` - Clipboard paste + message history
+3. `frontend/src/hooks/useMessageHistory.ts` - Up arrow navigation
+4. `backend/internal/handler/upload.go` - Image upload endpoint
+5. `frontend/src/components/savings/CostSavingsCard.tsx` - Cost savings display
+6. `frontend/src/components/projects/FileExplorer.tsx` - Only Purpose + Tree views
+
+## New Features Added
+
+### Image Upload (Phase 1)
+- `POST /api/projects/:id/upload` - multipart form upload
+- Supports PNG, JPG, GIF, WebP (max 10MB)
+- Claude Vision converts to markdown
+- Stored in `sources/` folder with "Source Materials" group
+- Migration: `008_file_sources.sql`
+
+### Chat Input Enhancements
+- **Clipboard paste**: Ctrl/Cmd+V pastes screenshots directly
+- **Up arrow history**: Cycles through previous messages (50 max, per-project)
+- Preview before sending with remove button
+
+### Cost Savings
+- Shows PM + Dev time equivalents
+- Integrated into DiscoverySummaryModal
+- Uses message count to estimate value
 
 ## Changes Summary
 
 ### Chat UI
-- Agent colors consistent (all messages show Root label)
-- Word wrap on inline code blocks (no more overflow)
-- Collapsible code blocks with line count
-- Zoom slider 25%-150%
+- Removed "Show raw output" toggle during streaming
+- Content renders normally while streaming (no separate path)
+- Streaming indicator dots at end of message
+- Progressive disclosure disabled during streaming
+- Removed CollapsibleList (lists render fully now)
+- Auto-scroll works during streaming
 
-### File Metadata
-- Harvest outputs YAML front matter in code blocks
-- Format: short_description, long_description, functional_group
-- Existing files need regeneration to get metadata
-
-### Backend
-- API timeout: 60s -> 180s
-- Error responses include messageId for cleanup
+### File Explorer
+- Removed "Descriptions" card view
+- Only "By Purpose" and "Files" (tree) remain
+- Default is "By Purpose"
 
 ## Git Status
 
-Branch is ahead of origin by ~8 commits. All changes committed.
+All changes committed and pushed to main.
 
 ## What's Next
 
-1. **Push changes** - `git push` to update remote
-2. **Test file metadata** - Ask Harvest to create a file, verify descriptions saved
-3. **Test zoom on mobile** - Verify slider works with touch
-4. **Consider MR** - Large feature set ready for review
+1. **Test new features**:
+   - Clipboard paste (Ctrl+V screenshot)
+   - Up arrow message history
+   - Image upload via chat
+   - Cost savings in summary modal
 
-## Suggested First Action
+2. **Pending PRD work**:
+   - Phase 2: PDF & DOCX upload
+   - Collapsible sections by heading (user requested)
+   - File picker button + drag-drop UI for chat
 
-```bash
-# Push all commits to remote
-git push
-
-# Then test the file metadata feature:
-# 1. Start backend with USE_MOCK_CLAUDE=true
-# 2. Create new project
-# 3. Ask Harvest to create a file
-# 4. Check if file has longDescription in explorer
-```
+3. **Run migration** if not done:
+   ```bash
+   psql -d your_db -f backend/migrations/008_file_sources.sql
+   ```
 
 ## Session History
 
-- SESSION-009: Phase 3 Learning Journey implementation
-- SESSION-010: Discovery UI fixes, hybrid summary modal
-- SESSION-011: Bug fixes for duplicates, formatting, title updates
-- SESSION-012: Agent personas (Root/Bloom/Harvest), discovery CTA
 - SESSION-013: Chat UI polish, collapsible code, zoom, file metadata
+- SESSION-014: Image upload, clipboard paste, message history, cost savings, streaming fixes
