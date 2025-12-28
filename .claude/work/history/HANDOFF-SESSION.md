@@ -8,6 +8,25 @@ Working on **Chat UX improvements & new features**. Major work on progressive di
 
 `main` (v1.0.0 released this session)
 
+## 🚨 BUG TO FIX FIRST
+
+**Clipboard paste shows preview but image not sent to Claude**
+
+When user pastes a screenshot:
+1. ✅ Preview appears at bottom of chat input ("Preview of pasted image")
+2. ✅ X button to remove works
+3. ❌ When message is sent, Root says "I don't see a screenshot attached"
+
+**The image is not being uploaded or included in the message.**
+
+Files to check:
+- `frontend/src/components/chat/ChatInput.tsx` - handleSend function, upload logic
+- `backend/internal/handler/upload.go` - upload endpoint
+- Check if upload is actually being called
+- Check if image data is being sent to Claude in the message
+
+Screenshot of bug attached to this session.
+
 ## Last Tasks Completed
 
 1. Progressive disclosure for long chat content
@@ -21,12 +40,11 @@ Working on **Chat UX improvements & new features**. Major work on progressive di
 
 ## Critical Files to Read
 
-1. `frontend/src/components/chat/MessageBubble.tsx` - Simplified streaming, no CollapsibleList
-2. `frontend/src/components/chat/ChatInput.tsx` - Clipboard paste + message history
-3. `frontend/src/hooks/useMessageHistory.ts` - Up arrow navigation
-4. `backend/internal/handler/upload.go` - Image upload endpoint
+1. `frontend/src/components/chat/ChatInput.tsx` - Clipboard paste + message history (BUG HERE)
+2. `backend/internal/handler/upload.go` - Image upload endpoint
+3. `frontend/src/components/chat/MessageBubble.tsx` - Simplified streaming, no CollapsibleList
+4. `frontend/src/hooks/useMessageHistory.ts` - Up arrow navigation
 5. `frontend/src/components/savings/CostSavingsCard.tsx` - Cost savings display
-6. `frontend/src/components/projects/FileExplorer.tsx` - Only Purpose + Tree views
 
 ## New Features Added
 
@@ -68,18 +86,18 @@ All changes committed and pushed to main.
 
 ## What's Next
 
-1. **Test new features**:
-   - Clipboard paste (Ctrl+V screenshot)
+1. **FIX BUG**: Clipboard paste not sending image (see above)
+
+2. **Then test**:
    - Up arrow message history
-   - Image upload via chat
    - Cost savings in summary modal
 
-2. **Pending PRD work**:
+3. **Pending PRD work**:
    - Phase 2: PDF & DOCX upload
    - Collapsible sections by heading (user requested)
    - File picker button + drag-drop UI for chat
 
-3. **Run migration** if not done:
+4. **Run migration** if not done:
    ```bash
    psql -d your_db -f backend/migrations/008_file_sources.sql
    ```
