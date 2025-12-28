@@ -4,11 +4,15 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useDiscovery } from '@/hooks/useDiscovery';
 import { useDiscoveryExperience } from '@/hooks/useDiscoveryExperience';
+import { useBuildPhase } from '@/hooks/useBuildPhase';
 import { MessageList, MessageListHandle } from './MessageList';
 import { ChatInput } from './ChatInput';
+import { BuildPhaseProgress } from './BuildPhaseProgress';
+import { MilestoneToast } from './MilestoneToast';
 import { ConnectionStatus } from '@/components/shared/ConnectionStatus';
 import { DiscoveryProgress, DiscoveryStageDrawer } from '@/components/discovery';
 import { DiscoverySummaryModal } from '@/components/discovery/DiscoverySummaryModal';
+import { CostSavingsIcon } from '@/components/savings';
 import { Message } from '@/types';
 
 interface ChatContainerProps {
@@ -60,6 +64,20 @@ export function ChatContainer({
   // Track if user has completed discovery before (for skip option)
   const { hasCompletedBefore, isLoaded: experienceLoaded, markDiscoveryCompleted } = useDiscoveryExperience();
 
+  // Build phase tracking (post-discovery)
+  const discoveryComplete = currentStage === 'complete';
+  const {
+    currentPhase,
+    messagesByPhase,
+    newlyCompletedPhase,
+    acknowledgePhase,
+    scrollToPhase,
+  } = useBuildPhase({
+    messages,
+    isDiscoveryMode,
+    discoveryComplete,
+  });
+
   const [showStageDrawer, setShowStageDrawer] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -69,6 +87,7 @@ export function ChatContainer({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(projectTitle);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [showPhasedView, setShowPhasedView] = useState(false);
   const messageListRef = useRef<MessageListHandle>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -286,7 +305,14 @@ export function ChatContainer({
             </h1>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Cost Savings Icon - shown when there are messages */}
+          {messages.length > 0 && (
+            <CostSavingsIcon
+              metrics={{ messageCount: messages.length, filesGenerated: 0 }}
+              storageKey={`cost-savings-${projectId}`}
+            />
+          )}
           {showViewSummaryButton && (
             <button
               onClick={() => setShowSummaryModal(true)}
@@ -311,6 +337,27 @@ export function ChatContainer({
         </div>
       </header>
 
+      {/* Build Phase Progress - shown after discovery is complete */}
+      {discoveryComplete && messages.length > 0 && (
+        <BuildPhaseProgress
+          messages={messages}
+          isDiscoveryMode={isDiscoveryMode}
+          discoveryComplete={discoveryComplete}
+          currentPhase={currentPhase}
+          onPhaseClick={scrollToPhase}
+          showPhasedView={showPhasedView}
+          onTogglePhasedView={() => setShowPhasedView((prev) => !prev)}
+        />
+      )}
+
+      {/* Milestone Toast - shows when a phase completes */}
+      {newlyCompletedPhase && (
+        <MilestoneToast
+          phase={newlyCompletedPhase}
+          onDismiss={() => acknowledgePhase(newlyCompletedPhase)}
+        />
+      )}
+
       {/* Error banner */}
       {error && (
         <div className="flex items-center justify-between px-4 py-2 bg-red-50 border-b border-red-100">
@@ -331,10 +378,12 @@ export function ChatContainer({
         projectId={projectId}
         isLoading={isLoading}
         isDiscoveryMode={isDiscoveryMode}
+        currentStage={currentStage}
         showSkipDiscovery={experienceLoaded && hasCompletedBefore && !isSkipping}
         onSkipDiscovery={handleSkipDiscovery}
         onStartDiscovery={handleStartDiscovery}
         isStartingDiscovery={isStartingDiscovery}
+        showPhasedView={showPhasedView && discoveryComplete}
       />
 
       {/* Discovery Complete Notification Bar - slim bar that opens modal */}

@@ -73,14 +73,16 @@ describe('MessageBubble', () => {
     render(<MessageBubble message={streamingMessage} />);
 
     expect(screen.getByText('I am currently typing')).toBeInTheDocument();
-    // Streaming indicator is a pipe character
-    expect(screen.getByText('|')).toBeInTheDocument();
+    // Streaming indicator is animated bouncing dots
+    const streamingIndicator = document.querySelector('.animate-bounce');
+    expect(streamingIndicator).toBeInTheDocument();
   });
 
   it('does not show streaming indicator for completed messages', () => {
     render(<MessageBubble message={assistantMessage} />);
 
-    expect(screen.queryByText('|')).not.toBeInTheDocument();
+    const streamingIndicator = document.querySelector('.animate-bounce');
+    expect(streamingIndicator).not.toBeInTheDocument();
   });
 
   it('renders copy button for code blocks', () => {

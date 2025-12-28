@@ -186,6 +186,7 @@ export function useProject(projectId: string, projects?: Project[]): UseProjectR
         updatedAt: data.updatedAt,
       });
       // Transform messages from API format (createdAt) to frontend format (timestamp)
+      // Note: agentType is automatically included via the spread operator from the API response
       const transformedMessages: Message[] = (data.messages || []).map((msg) => ({
         ...msg,
         timestamp: (msg as { createdAt?: string }).createdAt || msg.timestamp || new Date().toISOString(),

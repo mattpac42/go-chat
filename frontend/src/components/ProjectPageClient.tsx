@@ -1,16 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ProjectList } from '@/components/projects/ProjectList';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { FileExplorer } from '@/components/projects/FileExplorer';
+import { ProjectPreview } from '@/components/preview/ProjectPreview';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useProjects, useProject } from '@/hooks/useProjects';
 import { useFiles } from '@/hooks/useFiles';
+import { usePreviewFiles } from '@/hooks/usePreviewFiles';
 import { Project } from '@/types';
 import { API_BASE_URL } from '@/lib/api';
+
+type RightPanelView = 'files' | 'preview';
 
 export function ProjectPageClient() {
   const params = useParams();
@@ -35,6 +39,7 @@ export function ProjectPageClient() {
   } = useProject(projectId, projects);
 
   const {
+    files,
     fileTree,
     isLoading: isLoadingFiles,
     fetchFiles,
@@ -43,7 +48,17 @@ export function ProjectPageClient() {
 
   console.log('[ProjectPageClient] fileTree:', fileTree, 'isLoadingFiles:', isLoadingFiles);
 
+  const { previewFiles, isLoading: isLoadingPreview, loadAllFiles } = usePreviewFiles();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('files');
+
+  // Load preview files when files change and preview tab is active
+  useEffect(() => {
+    if (rightPanelView === 'preview' && files.length > 0) {
+      loadAllFiles(files);
+    }
+  }, [rightPanelView, files, loadAllFiles]);
 
   const handleNewProject = useCallback(async () => {
     const newProject = await createProject();
@@ -253,17 +268,41 @@ export function ProjectPageClient() {
         )}
       </main>
 
-      {/* Right sidebar - Files with 2-tier reveal system */}
+      {/* Right sidebar - Files/Preview with tabs */}
       <aside className="hidden lg:flex lg:w-80 lg:flex-shrink-0 border-l border-gray-200 bg-white flex-col">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">App Files</h2>
-            {fileTree.length > 0 && (
+        {/* Tab header */}
+        <div className="px-4 py-2 border-b border-gray-200">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setRightPanelView('files')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                rightPanelView === 'files'
+                  ? 'bg-teal-100 text-teal-700'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+            >
+              Files
+            </button>
+            <button
+              onClick={() => setRightPanelView('preview')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                rightPanelView === 'preview'
+                  ? 'bg-teal-100 text-teal-700'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview
+            </button>
+            {rightPanelView === 'files' && fileTree.length > 0 && (
               <button
                 onClick={() => {
                   window.open(`${API_BASE_URL}/api/projects/${projectId}/download`, '_blank');
                 }}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 title="Download all files as ZIP"
                 aria-label="Download all files as ZIP"
               >
@@ -273,19 +312,40 @@ export function ProjectPageClient() {
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Click to see what each file does
-          </p>
         </div>
-        <div className="flex-1 overflow-hidden">
-          <FileExplorer
-            files={fileTree}
-            onLoadContent={getFile}
-            defaultViewMode="grouped"
-            showViewToggle={true}
-            isLoading={isLoadingFiles}
-          />
-        </div>
+
+        {/* Files view */}
+        {rightPanelView === 'files' && (
+          <>
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-xs text-gray-400">
+                Click to see what each file does
+              </p>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <FileExplorer
+                files={fileTree}
+                onLoadContent={getFile}
+                defaultViewMode="grouped"
+                showViewToggle={true}
+                isLoading={isLoadingFiles}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Preview view */}
+        {rightPanelView === 'preview' && (
+          <div className="flex-1 overflow-hidden">
+            {isLoadingPreview ? (
+              <div className="flex items-center justify-center h-full">
+                <LoadingSpinner size="lg" />
+              </div>
+            ) : (
+              <ProjectPreview files={previewFiles} />
+            )}
+          </div>
+        )}
       </aside>
     </div>
   );

@@ -1,19 +1,27 @@
 'use client';
 
-import { useEffect, useRef, useLayoutEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useLayoutEffect, useMemo, forwardRef, useImperativeHandle, useState } from 'react';
 import { Message, AgentType } from '@/types';
+import { DiscoveryStage } from '@/types/discovery';
 import { MessageBubble } from './MessageBubble';
+import { PersonaIntroduction, isIntroductionMessage, isTeamIntroMessage } from './PersonaIntroduction';
+import { PhaseSection } from './PhaseSection';
+import { BuildPhase, groupMessagesByPhase, detectCurrentPhase } from './BuildPhaseProgress';
 import { useAgentIntroductions } from '@/hooks/useAgentIntroductions';
+import { usePersonaIntroductions } from '@/hooks/usePersonaIntroductions';
 
 interface MessageListProps {
   messages: Message[];
   projectId: string;
   isLoading?: boolean;
   isDiscoveryMode?: boolean;
+  currentStage?: DiscoveryStage;
   showSkipDiscovery?: boolean;
   onSkipDiscovery?: () => void;
   onStartDiscovery?: () => void;
   isStartingDiscovery?: boolean;
+  /** Show messages grouped by build phase with collapsible sections */
+  showPhasedView?: boolean;
 }
 
 export interface MessageListHandle {
@@ -25,10 +33,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   projectId,
   isLoading = false,
   isDiscoveryMode = false,
+  currentStage = 'welcome',
   showSkipDiscovery = false,
   onSkipDiscovery,
   onStartDiscovery,
   isStartingDiscovery = false,
+  showPhasedView = false,
 }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -47,16 +57,34 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // Track which agents have been introduced to the user
   const { hasMetAgent, markAgentMet } = useAgentIntroductions(projectId);
 
+  // Handle persona introductions when transitioning from discovery to building
+  const { processMessagesWithIntroductions } = usePersonaIntroductions(
+    projectId,
+    currentStage,
+    messages
+  );
+
+  // Process messages to inject persona introductions if needed
+  const processedMessages = useMemo(() => {
+    return processMessagesWithIntroductions(messages);
+  }, [messages, processMessagesWithIntroductions]);
+
   // Process messages to determine which should show the "NEW" badge
   // An agent gets a badge only on their FIRST appearance in this session
   // AND only if the user hasn't met them before (across sessions)
+  // Skip badge logic for introduction messages (they have their own styling)
   const messagesWithBadges = useMemo(() => {
     const seenInThisRender = new Set<AgentType>();
 
-    return messages.map((message) => {
+    return processedMessages.map((message) => {
+      // Introduction messages have their own styling, don't show badges
+      if (isIntroductionMessage(message)) {
+        return { message, showBadge: false, isIntro: true, isTeamIntro: isTeamIntroMessage(message) };
+      }
+
       // Only assistant messages with agentType can have badges
       if (message.role !== 'assistant' || !message.agentType) {
-        return { message, showBadge: false };
+        return { message, showBadge: false, isIntro: false, isTeamIntro: false };
       }
 
       const agentType = message.agentType;
@@ -74,9 +102,28 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
         markAgentMet(agentType);
       }
 
-      return { message, showBadge };
+      return { message, showBadge, isIntro: false, isTeamIntro: false };
     });
-  }, [messages, hasMetAgent, markAgentMet]);
+  }, [processedMessages, hasMetAgent, markAgentMet]);
+
+  // Group messages by build phase for phased view
+  const messagesByPhase = useMemo(() => {
+    return groupMessagesByPhase(messages);
+  }, [messages]);
+
+  // Get current phase for phased view
+  const currentPhase = useMemo(() => {
+    return detectCurrentPhase(messages);
+  }, [messages]);
+
+  // Create a lookup for badges by message id
+  const badgeLookup = useMemo(() => {
+    const lookup = new Map<string, boolean>();
+    messagesWithBadges.forEach(({ message, showBadge }) => {
+      lookup.set(message.id, showBadge);
+    });
+    return lookup;
+  }, [messagesWithBadges]);
 
   // Instant scroll to bottom on initial load (no animation)
   useLayoutEffect(() => {
@@ -204,19 +251,59 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     );
   }
 
+  // Phase labels for phased view
+  const phaseLabels: Record<BuildPhase, string> = {
+    discovery: 'Discovery',
+    planning: 'Planning',
+    building: 'Building',
+    testing: 'Testing',
+    launch: 'Launch',
+  };
+
   return (
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto p-4"
       data-testid="message-list"
     >
-      {messagesWithBadges.map(({ message, showBadge }) => (
-        <MessageBubble
-          key={message.id}
-          message={message}
-          showBadge={showBadge}
-        />
-      ))}
+      {showPhasedView ? (
+        // Phased view: messages grouped by build phase with collapsible sections
+        <>
+          {(['discovery', 'planning', 'building', 'testing', 'launch'] as BuildPhase[]).map((phase) => {
+            const phaseMessages = messagesByPhase.get(phase) || [];
+            if (phaseMessages.length === 0) return null;
+
+            return (
+              <PhaseSection
+                key={phase}
+                phase={phase}
+                label={phaseLabels[phase]}
+                messages={phaseMessages}
+                isCurrentPhase={phase === currentPhase}
+                defaultExpanded={phase === currentPhase}
+                showBadgeForMessage={(messageId) => badgeLookup.get(messageId) ?? false}
+              />
+            );
+          })}
+        </>
+      ) : (
+        // Standard view: messages in chronological order
+        messagesWithBadges.map(({ message, showBadge, isIntro, isTeamIntro }) => (
+          isIntro ? (
+            <PersonaIntroduction
+              key={message.id}
+              message={message}
+              isTeamIntro={isTeamIntro}
+            />
+          ) : (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              showBadge={showBadge}
+            />
+          )
+        ))
+      )}
 
       {/* Loading indicator */}
       {isLoading && !messages.some((m) => m.isStreaming) && (

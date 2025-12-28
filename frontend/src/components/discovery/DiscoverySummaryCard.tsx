@@ -107,7 +107,9 @@ export function DiscoverySummaryCard({
   const { projectName, solvesStatement, users, mvpFeatures, futureFeatures } = summary;
 
   const hasFutureFeatures = futureFeatures.length > 0;
-  const hasUsers = users.length > 0;
+  // Filter out users with count 0 or undefined/null before checking
+  const validUsers = users.filter((user) => user.count != null && user.count > 0);
+  const hasUsers = validUsers.length > 0;
   const hasMvpFeatures = mvpFeatures.length > 0;
 
   return (
@@ -144,7 +146,7 @@ export function DiscoverySummaryCard({
             <SectionHeader>Users</SectionHeader>
             {hasUsers ? (
               <ul className="space-y-1">
-                {users.map((user) => (
+                {validUsers.map((user) => (
                   <li key={user.id} className="flex items-start text-sm text-gray-800">
                     <UserDot hasPermissions={user.hasPermissions} />
                     <span>

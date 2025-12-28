@@ -111,6 +111,7 @@ export function useChat({ projectId, initialMessages = [] }: UseChatOptions): Us
                   ...msg,
                   content: serverMessage.fullContent || msg.content,
                   isStreaming: false,
+                  agentType: serverMessage.agentType || msg.agentType,
                 }
               : msg
           ),

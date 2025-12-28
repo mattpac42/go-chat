@@ -9,16 +9,50 @@ export * from './achievements';
 // The 'product_manager' type is displayed as "Root" (the discovery/foundation agent)
 export type AgentType = 'product_manager' | 'product' | 'designer' | 'developer';
 
-export const AGENT_CONFIG: Record<AgentType, {
+export interface AgentConfig {
   displayName: string;
   shortName: string;
   color: string;
   bgColor: string;
-}> = {
-  product_manager: { displayName: 'Root', shortName: 'Root', color: '#0D9488', bgColor: '#CCFBF1' }, // Teal - discovery/foundation
-  product: { displayName: 'Root', shortName: 'Root', color: '#0D9488', bgColor: '#CCFBF1' }, // Legacy alias
-  designer: { displayName: 'Bloom', shortName: 'Bloom', color: '#F97316', bgColor: '#FFF7ED' }, // Orange - ideas flourish into designs
-  developer: { displayName: 'Harvest', shortName: 'Harvest', color: '#10B981', bgColor: '#ECFDF5' }, // Green - bringing ideas to fruition
+  /** Root's description when introducing this agent */
+  rootIntro: string;
+  /** The agent's self-introduction message */
+  selfIntro: string;
+}
+
+export const AGENT_CONFIG: Record<AgentType, AgentConfig> = {
+  product_manager: {
+    displayName: 'Root',
+    shortName: 'Root',
+    color: '#0D9488',
+    bgColor: '#CCFBF1',
+    rootIntro: '', // Root doesn't introduce themselves
+    selfIntro: '', // Root doesn't have a self-intro
+  }, // Teal - discovery/foundation
+  product: {
+    displayName: 'Root',
+    shortName: 'Root',
+    color: '#0D9488',
+    bgColor: '#CCFBF1',
+    rootIntro: '',
+    selfIntro: '',
+  }, // Legacy alias
+  designer: {
+    displayName: 'Bloom',
+    shortName: 'Bloom',
+    color: '#F97316',
+    bgColor: '#FFF7ED',
+    rootIntro: "Meet Bloom, our designer - she'll craft the visual experience and user interface.",
+    selfIntro: "Hi! I'm excited to design your project. I'll focus on making it intuitive and beautiful.",
+  }, // Orange - ideas flourish into designs
+  developer: {
+    displayName: 'Harvest',
+    shortName: 'Harvest',
+    color: '#10B981',
+    bgColor: '#ECFDF5',
+    rootIntro: "And Harvest, our developer - he'll write the code and bring everything to life.",
+    selfIntro: "Hey! Ready to build this. I'll handle the technical implementation and make sure everything works smoothly.",
+  }, // Green - bringing ideas to fruition
 };
 
 // Project types
@@ -100,6 +134,7 @@ export interface ServerMessage {
   messageId: string;
   content?: string;
   fullContent?: string;
+  agentType?: AgentType;
   error?: string;
 }
 
