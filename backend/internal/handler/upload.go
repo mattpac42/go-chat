@@ -21,7 +21,16 @@ const (
 	MaxUploadSize = 10 * 1024 * 1024
 
 	// VisionPrompt is the prompt used for Claude Vision to describe images.
-	VisionPrompt = "Describe this image in detail. If there is any text, transcribe it exactly. Format as markdown."
+	// The response format includes a smart filename on the first line.
+	VisionPrompt = `First, provide a short descriptive filename (1-3 words, kebab-case) for this image on the FIRST line, prefixed with "FILENAME:".
+
+Then describe this image in detail. If there is any text, transcribe it exactly. Format as markdown.
+
+Example response format:
+FILENAME: login-screen-mockup
+
+## Login Screen Design
+...`
 
 	// SourceMaterialsGroup is the functional group for uploaded source materials.
 	SourceMaterialsGroup = "Source Materials"
@@ -140,19 +149,27 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		Msg("processing image upload")
 
 	// Call Claude Vision to analyze the image
-	markdownContent, err := h.claudeVision.AnalyzeImage(c.Request.Context(), imageData, mimeType, VisionPrompt)
+	visionResponse, err := h.claudeVision.AnalyzeImage(c.Request.Context(), imageData, mimeType, VisionPrompt)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to analyze image with Claude Vision")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to analyze image"})
 		return
 	}
 
-	// Generate file path in sources/ folder
+	// Parse vision response to extract smart filename and content
+	smartFilename, markdownContent := parseVisionResponse(visionResponse)
+
+	// Generate file path in sources/ folder using smart filename
 	originalFilename := fileHeader.Filename
-	baseFilename := sanitizeUploadFilename(originalFilename)
 	timestamp := time.Now().Format("2006-01-02")
-	mdFilename := fmt.Sprintf("%s-%s.md", baseFilename, timestamp)
+	mdFilename := fmt.Sprintf("%s-%s.md", smartFilename, timestamp)
 	filePath := fmt.Sprintf("sources/%s", mdFilename)
+
+	h.logger.Debug().
+		Str("originalFilename", originalFilename).
+		Str("smartFilename", smartFilename).
+		Str("filePath", filePath).
+		Msg("generated smart filename from vision response")
 
 	// Save the markdown file
 	savedFile, err := h.fileRepo.SaveFile(c.Request.Context(), projectID, filePath, "markdown", markdownContent)
@@ -232,6 +249,91 @@ func sanitizeUploadFilename(filename string) string {
 	}
 
 	return strings.ToLower(sanitized)
+}
+
+// parseVisionResponse extracts a smart filename and content from Claude Vision's response.
+// It expects the response to have "FILENAME: <name>" on the first line, followed by the content.
+// Returns the sanitized filename and the remaining content.
+// Falls back to "image-upload" if parsing fails.
+func parseVisionResponse(response string) (filename, content string) {
+	const defaultFilename = "image-upload"
+
+	if response == "" {
+		return defaultFilename, ""
+	}
+
+	// Find the first newline to extract the first line
+	firstNewline := strings.Index(response, "\n")
+	var firstLine string
+	var restOfContent string
+
+	if firstNewline == -1 {
+		// No newline, entire response is first line
+		firstLine = response
+		restOfContent = ""
+	} else {
+		firstLine = response[:firstNewline]
+		restOfContent = response[firstNewline+1:]
+	}
+
+	// Check if first line starts with "FILENAME:"
+	const prefix = "FILENAME:"
+	if !strings.HasPrefix(firstLine, prefix) {
+		// No FILENAME prefix, return default filename and full response as content
+		return defaultFilename, response
+	}
+
+	// Extract the filename after the prefix
+	rawFilename := strings.TrimSpace(strings.TrimPrefix(firstLine, prefix))
+	if rawFilename == "" {
+		// Empty filename after prefix, use default
+		return defaultFilename, strings.TrimLeft(restOfContent, "\n")
+	}
+
+	// Sanitize the filename
+	sanitizedFilename := sanitizeSmartFilename(rawFilename)
+
+	// Trim leading newlines from content
+	content = strings.TrimLeft(restOfContent, "\n")
+
+	return sanitizedFilename, content
+}
+
+// sanitizeSmartFilename sanitizes a filename for use in file paths.
+// - Converts to lowercase
+// - Replaces spaces and underscores with dashes
+// - Removes invalid characters (keeps only alphanumeric and dashes)
+// - Truncates to 40 characters
+// - Falls back to "image-upload" if result is empty
+func sanitizeSmartFilename(filename string) string {
+	// Convert to lowercase
+	filename = strings.ToLower(filename)
+
+	// Replace spaces and underscores with dashes
+	filename = strings.ReplaceAll(filename, " ", "-")
+	filename = strings.ReplaceAll(filename, "_", "-")
+
+	// Keep only alphanumeric characters and dashes
+	var result strings.Builder
+	for _, r := range filename {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+
+	sanitized := result.String()
+
+	// Truncate to 40 characters
+	if len(sanitized) > 40 {
+		sanitized = sanitized[:40]
+	}
+
+	// Fall back to default if empty
+	if sanitized == "" {
+		sanitized = "image-upload"
+	}
+
+	return sanitized
 }
 
 // extractShortDescription creates a short description from the first meaningful line of content.

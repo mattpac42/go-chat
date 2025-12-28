@@ -70,6 +70,12 @@ export function ProjectPageClient() {
     await renameProject(project.id, newTitle);
   }, [renameProject]);
 
+  const handleTitleUpdate = useCallback(async (newTitle: string) => {
+    await renameProject(projectId, newTitle);
+    // Refresh project list to update sidebar
+    await fetchProjects();
+  }, [renameProject, projectId, fetchProjects]);
+
   const handleProjectDelete = useCallback(async (project: Project) => {
     const success = await deleteProject(project.id);
     if (success) {
@@ -242,6 +248,7 @@ export function ProjectPageClient() {
             onStreamingComplete={fetchFiles}
             onDiscoveryConfirmed={fetchProjects}
             onRefetchMessages={fetchProject}
+            onTitleUpdate={handleTitleUpdate}
           />
         )}
       </main>

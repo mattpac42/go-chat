@@ -19,6 +19,7 @@ interface ChatContainerProps {
   onStreamingComplete?: () => void;
   onDiscoveryConfirmed?: () => void;
   onRefetchMessages?: () => Promise<void>;
+  onTitleUpdate?: (newTitle: string) => Promise<void>;
 }
 
 export function ChatContainer({
@@ -29,6 +30,7 @@ export function ChatContainer({
   onStreamingComplete,
   onDiscoveryConfirmed,
   onRefetchMessages,
+  onTitleUpdate,
 }: ChatContainerProps) {
   const {
     messages,
@@ -64,7 +66,11 @@ export function ChatContainer({
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
   const [isStartingDiscovery, setIsStartingDiscovery] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(projectTitle);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
   const messageListRef = useRef<MessageListHandle>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Track previous loading state to detect when streaming completes
   const wasLoadingRef = useRef(false);
@@ -86,6 +92,62 @@ export function ChatContainer({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Sync editedTitle when projectTitle changes externally
+  useEffect(() => {
+    setEditedTitle(projectTitle);
+  }, [projectTitle]);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  // Title editing handlers
+  const handleTitleClick = useCallback(() => {
+    if (onTitleUpdate) {
+      setIsEditingTitle(true);
+    }
+  }, [onTitleUpdate]);
+
+  const handleTitleSave = useCallback(async () => {
+    const trimmedTitle = editedTitle.trim();
+    if (!trimmedTitle || trimmedTitle === projectTitle) {
+      setEditedTitle(projectTitle);
+      setIsEditingTitle(false);
+      return;
+    }
+
+    if (onTitleUpdate) {
+      setIsSavingTitle(true);
+      try {
+        await onTitleUpdate(trimmedTitle);
+        setIsEditingTitle(false);
+      } catch (error) {
+        console.error('Failed to update title:', error);
+        setEditedTitle(projectTitle);
+      } finally {
+        setIsSavingTitle(false);
+      }
+    }
+  }, [editedTitle, projectTitle, onTitleUpdate]);
+
+  const handleTitleCancel = useCallback(() => {
+    setEditedTitle(projectTitle);
+    setIsEditingTitle(false);
+  }, [projectTitle]);
+
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      handleTitleCancel();
+    }
+  }, [handleTitleSave, handleTitleCancel]);
 
   // Discovery summary handlers
   const handleConfirmDiscovery = async () => {
@@ -190,19 +252,39 @@ export function ChatContainer({
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white sticky top-0 z-10 safe-area-pt">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {onMenuClick && (
             <button
               onClick={onMenuClick}
-              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 md:hidden"
+              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 md:hidden flex-shrink-0"
               aria-label="Open menu"
             >
               <MenuIcon className="w-6 h-6 text-gray-600" />
             </button>
           )}
-          <h1 className="text-lg font-semibold text-gray-900 truncate">
-            {projectTitle}
-          </h1>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              disabled={isSavingTitle}
+              className="text-lg font-semibold text-gray-900 bg-transparent border-b-2 border-teal-400 outline-none px-1 py-0 min-w-0 flex-1 disabled:opacity-50"
+              aria-label="Edit project title"
+            />
+          ) : (
+            <h1
+              onClick={handleTitleClick}
+              className={`text-lg font-semibold text-gray-900 truncate ${
+                onTitleUpdate ? 'cursor-pointer hover:text-teal-600 transition-colors' : ''
+              }`}
+              title={onTitleUpdate ? 'Click to edit title' : undefined}
+            >
+              {projectTitle}
+            </h1>
+          )}
         </div>
         <div className="flex items-center gap-4">
           {showViewSummaryButton && (
