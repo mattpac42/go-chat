@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { DiscoverySummary } from './DiscoverySummaryCard';
+import { CostSavingsCard } from '@/components/savings';
+import { useCostSavings } from '@/hooks/useCostSavings';
 
 interface DiscoverySummaryModalProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ interface DiscoverySummaryModalProps {
   onEdit?: () => void;
   onStartOver?: () => void;
   isConfirming?: boolean;
+  /** Message count from the discovery session for cost savings calculation */
+  messageCount?: number;
 }
 
 function CloseIcon({ className }: { className?: string }) {
@@ -101,10 +105,17 @@ export function DiscoverySummaryModal({
   onEdit,
   onStartOver,
   isConfirming = false,
+  messageCount = 0,
 }: DiscoverySummaryModalProps) {
   // Determine if we're in action mode (pre-confirmation) or view-only mode
   const isActionMode = !!(onConfirm && onEdit && onStartOver);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Calculate cost savings based on discovery session metrics
+  const { data: savingsData } = useCostSavings({
+    messageCount,
+    filesGenerated: 0, // Discovery phase doesn't generate files
+  });
 
   // Close on escape key
   useEffect(() => {
@@ -264,6 +275,13 @@ export function DiscoverySummaryModal({
             </div>
           )}
         </div>
+
+        {/* Cost Savings Section */}
+        {messageCount > 0 && (
+          <div className="px-6 pb-4">
+            <CostSavingsCard data={savingsData} showDetailed={false} />
+          </div>
+        )}
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 rounded-b-xl">

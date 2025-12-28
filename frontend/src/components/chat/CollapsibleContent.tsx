@@ -7,6 +7,8 @@ interface CollapsibleContentProps {
   paragraphThreshold?: number;
   visibleParagraphs?: number;
   isUserMessage?: boolean;
+  /** When true, disables collapsing entirely (useful during streaming) */
+  disabled?: boolean;
 }
 
 /**
@@ -18,6 +20,7 @@ export function CollapsibleContent({
   paragraphThreshold = 3,
   visibleParagraphs = 2,
   isUserMessage = false,
+  disabled = false,
 }: CollapsibleContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
@@ -28,7 +31,7 @@ export function CollapsibleContent({
   // Count paragraph-level elements (p, h1-h6, pre, ul, ol, blockquote)
   const childArray = Children.toArray(children);
   const paragraphCount = countParagraphElements(childArray);
-  const shouldCollapse = paragraphCount > paragraphThreshold;
+  const shouldCollapse = !disabled && paragraphCount > paragraphThreshold;
 
   // Measure heights for smooth animation
   useEffect(() => {

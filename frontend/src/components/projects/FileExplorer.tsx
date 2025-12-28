@@ -6,7 +6,7 @@ import { FileTree } from './FileTree';
 import { FileRevealList } from './FileRevealList';
 import { FilePreviewModal } from '../shared/FilePreviewModal';
 
-export type ViewMode = 'tree' | 'reveal' | 'grouped';
+export type ViewMode = 'tree' | 'grouped';
 
 interface FileExplorerProps {
   files: FileNode[];
@@ -29,18 +29,6 @@ function TreeViewIcon({ className }: { className?: string }) {
   );
 }
 
-function CardViewIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-      />
-    </svg>
-  );
-}
 
 function GroupViewIcon({ className }: { className?: string }) {
   return (
@@ -82,15 +70,14 @@ function LoadingSpinner({ className }: { className?: string }) {
 /**
  * FileExplorer - Unified file browsing component
  *
- * Supports three view modes:
+ * Supports two view modes:
+ * - grouped: Files organized by functional group (purpose view)
  * - tree: Traditional file tree (compact, for quick navigation)
- * - reveal: 2-tier reveal cards (descriptions first, code on expand)
- * - grouped: Files organized by functional group (App Map style)
  */
 export function FileExplorer({
   files,
   onLoadContent,
-  defaultViewMode = 'reveal',
+  defaultViewMode = 'grouped',
   showViewToggle = true,
   isLoading = false,
 }: FileExplorerProps) {
@@ -163,22 +150,10 @@ export function FileExplorer({
                 ? 'bg-teal-100 text-teal-700'
                 : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
             }`}
-            title="Group by function"
-            aria-label="Group by function"
+            title="Group by purpose"
+            aria-label="Group by purpose"
           >
             <GroupViewIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('reveal')}
-            className={`p-1.5 rounded transition-colors ${
-              viewMode === 'reveal'
-                ? 'bg-teal-100 text-teal-700'
-                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-            }`}
-            title="Card view with descriptions"
-            aria-label="Card view with descriptions"
-          >
-            <CardViewIcon className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('tree')}
@@ -195,7 +170,6 @@ export function FileExplorer({
 
           <span className="ml-auto text-xs text-gray-400">
             {viewMode === 'grouped' && 'By Purpose'}
-            {viewMode === 'reveal' && 'Descriptions'}
             {viewMode === 'tree' && 'Files'}
           </span>
         </div>
@@ -209,17 +183,6 @@ export function FileExplorer({
             selectedFile={selectedFile}
             onFileSelect={handleFileSelect}
           />
-        )}
-
-        {viewMode === 'reveal' && (
-          <div className="p-2">
-            <FileRevealList
-              files={files}
-              onLoadContent={onLoadContent}
-              groupByFunction={false}
-              showEmptyState={false}
-            />
-          </div>
         )}
 
         {viewMode === 'grouped' && (

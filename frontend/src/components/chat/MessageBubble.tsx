@@ -1,35 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message, AGENT_CONFIG } from '@/types';
 import { CodeBlock } from './CodeBlock';
 import { AgentHeader } from './AgentHeader';
-import { CollapsibleList } from './CollapsibleList';
 import { CollapsibleContent } from './CollapsibleContent';
 
 interface MessageBubbleProps {
   message: Message;
   showCodeBlocks?: boolean; // If false, replace code blocks with friendly summary
   showBadge?: boolean; // Show "NEW" badge for first agent introduction
-}
-
-function ChevronIcon({ isOpen, className }: { isOpen: boolean; className?: string }) {
-  return (
-    <svg
-      className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${className || ''}`}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 5l7 7-7 7"
-      />
-    </svg>
-  );
 }
 
 /**
@@ -248,9 +228,8 @@ export function MessageBubble({
   const isUser = message.role === 'user';
   const timestamp = getTimestamp(message);
   const formattedTime = formatTime(timestamp);
-  const [showRawContent, setShowRawContent] = useState(false);
 
-  // During streaming, show a generating message instead of raw content
+  // Track if message is currently streaming
   const isStreaming = message.isStreaming && !isUser;
 
   // Process content to hide code blocks for assistant messages
@@ -284,56 +263,25 @@ export function MessageBubble({
         style={bubbleStyle}
       >
         {/* Agent header for all assistant messages */}
-        {!isUser && effectiveAgentType && !isStreaming && (
+        {!isUser && effectiveAgentType && (
           <AgentHeader agentType={effectiveAgentType} showBadge={showBadge} />
         )}
 
-        {/* Streaming state: show generating message with expandable raw content */}
-        {isStreaming ? (
-          <div>
-            {/* Generating indicator */}
-            <div className="flex items-center gap-2 text-gray-600">
-              <span className="inline-flex">
-                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-teal-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '300ms' }} />
-              </span>
-              <span className="text-sm font-medium">Generating response...</span>
-            </div>
-
-            {/* Expandable raw content toggle */}
-            {message.content && (
-              <button
-                onClick={() => setShowRawContent(!showRawContent)}
-                className="flex items-center gap-1 mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <ChevronIcon isOpen={showRawContent} className="text-gray-400" />
-                <span>{showRawContent ? 'Hide' : 'Show'} raw output</span>
-              </button>
-            )}
-
-            {/* Raw content (collapsed by default) */}
-            {showRawContent && message.content && (
-              <div className="mt-2 p-2 bg-gray-200 rounded text-xs font-mono text-gray-600 max-h-40 overflow-auto whitespace-pre-wrap">
-                {message.content}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Normal rendering for completed messages */
-          <>
-            <CollapsibleContent
-              paragraphThreshold={3}
-              visibleParagraphs={2}
-              isUserMessage={isUser}
-            >
-              <div className={`prose prose-sm max-w-none break-words [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:max-w-full [&_code]:break-words [&_code]:whitespace-pre-wrap ${
-                isUser
-                  ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
-                  : 'prose-gray'
-              }`}>
-                <ReactMarkdown
-                  components={{
+        {/* Content - render normally whether streaming or complete */}
+        {/* Disable progressive disclosure during streaming to prevent flickering */}
+        <CollapsibleContent
+          paragraphThreshold={3}
+          visibleParagraphs={2}
+          isUserMessage={isUser}
+          disabled={isStreaming}
+        >
+          <div className={`prose prose-sm max-w-none break-words [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:max-w-full [&_code]:break-words [&_code]:whitespace-pre-wrap ${
+            isUser
+              ? 'prose-invert text-white prose-p:text-white prose-headings:text-white prose-strong:text-white prose-code:text-white prose-li:text-white prose-ol:text-white prose-ul:text-white [&_ol>li]:marker:text-white [&_ul>li]:marker:text-white'
+              : 'prose-gray'
+          }`}>
+            <ReactMarkdown
+              components={{
                   // Custom code block rendering
                   code: ({ className, children, ...props }) => {
                     const match = /language-(\w+)/.exec(className || '');
@@ -397,26 +345,11 @@ export function MessageBubble({
                     <h3 className={`text-base font-bold mb-2 ${isUser ? 'text-white' : 'text-gray-900'}`}>{children}</h3>
                   ),
                   // Style lists - use list-outside with padding for proper alignment
-                  // Auto-collapse lists with more than 5 items
                   ul: ({ children }) => (
-                    <CollapsibleList
-                      listType="ul"
-                      className="list-disc pl-5 mb-2 space-y-1"
-                      threshold={5}
-                      visibleCount={4}
-                    >
-                      {children}
-                    </CollapsibleList>
+                    <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>
                   ),
                   ol: ({ children }) => (
-                    <CollapsibleList
-                      listType="ol"
-                      className="list-decimal pl-5 mb-2 space-y-1"
-                      threshold={5}
-                      visibleCount={4}
-                    >
-                      {children}
-                    </CollapsibleList>
+                    <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>
                   ),
                   // Style list items to ensure inline display of number and content
                   li: ({ children }) => (
@@ -448,17 +381,26 @@ export function MessageBubble({
               </div>
             </CollapsibleContent>
 
-            {/* Timestamp */}
-            {formattedTime && (
-              <div
-                className={`text-xs mt-2 ${
-                  isUser ? 'text-teal-100' : 'text-gray-500'
-                }`}
-              >
-                {formattedTime}
-              </div>
-            )}
-          </>
+        {/* Streaming indicator - show after content */}
+        {isStreaming && (
+          <div className="flex items-center gap-2 mt-2 text-gray-500">
+            <span className="inline-flex">
+              <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '300ms' }} />
+            </span>
+          </div>
+        )}
+
+        {/* Timestamp - only show when not streaming */}
+        {!isStreaming && formattedTime && (
+          <div
+            className={`text-xs mt-2 ${
+              isUser ? 'text-teal-100' : 'text-gray-500'
+            }`}
+          >
+            {formattedTime}
+          </div>
         )}
       </div>
     </div>

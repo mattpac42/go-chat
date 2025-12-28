@@ -87,17 +87,23 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     }
   }, [messages]);
 
-  // Smooth scroll for new messages only (after initial load)
+  // Smooth scroll for new messages and streaming updates
   useEffect(() => {
-    // Skip if this is initial load or no new messages
-    if (isInitialLoad.current || messages.length <= prevMessageCount.current) {
+    // Skip if this is initial load
+    if (isInitialLoad.current) {
       prevMessageCount.current = messages.length;
       return;
     }
 
-    // New message added - smooth scroll
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    // Check if last message is streaming
+    const lastMessage = messages[messages.length - 1];
+    const isStreaming = lastMessage?.isStreaming;
+
+    // Scroll on new message OR while streaming
+    if (messages.length > prevMessageCount.current || isStreaming) {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     }
     prevMessageCount.current = messages.length;
   }, [messages]);

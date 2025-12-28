@@ -289,6 +289,7 @@ export function ChatContainer({
           isOpen={showSummaryModal}
           onClose={() => setShowSummaryModal(false)}
           summary={summary}
+          messageCount={messages.length}
           // Pass action handlers only when in summary stage (pre-confirmation)
           {...(showSummaryCard ? {
             onConfirm: handleConfirmDiscovery,
