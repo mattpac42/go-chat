@@ -1,59 +1,77 @@
-# Handoff - Session 015
+# Handoff - Session 016
 
 ## Immediate Context
 
-Working on **Chat UX & Image Upload improvements**. Fixed clipboard paste bug, added file attachment button and drag-drop, added inline title editing.
+Implemented 6 features in parallel using developer agents:
+1. Cost savings icon with popover and animation
+2. Sandbox iframe preview for HTML/CSS/JS
+3. Phase progress indicators (bar, sections, toasts)
+4. Persona introductions (Root introduces team)
+5. Fixed undefined users bug
+6. Fixed persona colors not showing until refresh
 
 ## Branch
 
-`main` - Changes not yet committed
+`main` - All changes committed (2bb2d2b)
 
-## Next Task: Smart File Naming for Uploads
+## Last Commit
 
-**User Request**: When uploading images/screenshots, rename them based on Claude Vision's analysis instead of generic names like "image-2025-12-27.md".
+```
+feat: add phase progress, persona intros, preview, and bug fixes
+```
 
-**Proposed Approach**:
-1. Modify Claude Vision prompt to extract:
-   - Short name (1-3 words) - becomes filename
-   - Long description - becomes metadata
-2. Update `backend/internal/handler/upload.go`:
-   - Parse Claude's response for short name
-   - Sanitize and use as filename
-   - Store long description in file_metadata
-3. Update Vision prompt in `VisionPrompt` constant
+36 files changed, +3033/-131 lines
 
-**Example**:
-- Before: `sources/image-2025-12-27.md`
-- After: `sources/bakery-menu-mockup.md`
+## Working Tree
 
-## Last Tasks Completed
-
-1. Fixed clipboard paste bug (Next.js API proxy)
-2. Added file attachment button (paperclip icon)
-3. Added drag-and-drop support
-4. Added inline title editing in chat header
+Clean - no uncommitted changes
 
 ## Critical Files to Read
 
-1. `backend/internal/handler/upload.go` - Current upload logic, Vision prompt
-2. `backend/internal/service/claude_vision.go` - Claude Vision API integration
-3. `backend/internal/repository/file_metadata.go` - Metadata storage
+1. `frontend/src/components/chat/ChatContainer.tsx` - Main integration point
+2. `frontend/src/components/chat/BuildPhaseProgress.tsx` - Phase detection logic
+3. `frontend/src/components/preview/ProjectPreview.tsx` - Sandbox iframe
+4. `frontend/src/hooks/usePersonaIntroductions.ts` - Intro injection logic
 
-## Uncommitted Changes
+## Known Issues
 
-```
- M frontend/src/components/ProjectPageClient.tsx
- M frontend/src/components/chat/ChatContainer.tsx
- M frontend/src/components/chat/ChatInput.tsx
-?? frontend/src/app/api/projects/[id]/upload/route.ts
-```
+1. **Pre-existing**: `ProjectCard.test.tsx` has 14 failing tests (aria-label changes from previous sessions)
+2. **Pre-existing**: Next.js error page build warnings (Html import issue)
+3. Phase detection uses content heuristics - may need refinement
 
-## Suggested First Action
+## Suggested First Actions
 
-1. Commit current changes first (image upload fixes + inline title editing)
-2. Then implement smart file naming in upload handler
+1. **Manual testing**: Test all 6 new features in browser
+2. **Push to remotes**: `git push origin main && git push gitlab main`
+3. **Fix ProjectCard tests**: Update aria-labels in tests to match current UI
+
+## Feature Details
+
+### Cost Savings Icon
+- Location: Header, before "Project Summary" button
+- Shows badge with total savings ($42, $1.2k format)
+- Pulse animation when savings increased since last view
+- Click opens popover with full CostSavingsCard
+
+### Preview Iframe
+- Location: Right sidebar, Files/Preview tabs
+- Sandboxed with `allow-scripts` only
+- Combines HTML + injects CSS/JS automatically
+- Shows empty state when no HTML file
+
+### Phase Indicators
+- Phases: Discovery → Planning → Building → Testing → Launch
+- Toggle button to switch timeline/grouped view
+- MilestoneToast auto-dismisses after 4s
+
+### Persona Introductions
+- Triggers when discovery completes and first non-Root message appears
+- Root introduces Bloom and Harvest
+- Each persona gives brief self-intro
+- Persisted to localStorage per project
 
 ## Session History
 
-- SESSION-014: Image upload, clipboard paste (bug discovered)
-- SESSION-015: Fixed paste bug, file attachment, drag-drop, inline title edit
+- SESSION-014: Image upload, clipboard paste
+- SESSION-015: Fixed paste bug, file attachment, drag-drop, inline title
+- SESSION-016: 6 parallel features (this session)
