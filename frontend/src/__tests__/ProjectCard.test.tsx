@@ -39,8 +39,8 @@ describe('ProjectCard', () => {
     it('shows pencil icon on hover when onRename is provided', () => {
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      expect(renameButton).toBeInTheDocument();
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      expect(editButton).toBeInTheDocument();
     });
   });
 
@@ -49,8 +49,8 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       expect(screen.getByRole('textbox')).toBeInTheDocument();
       expect(screen.getByRole('textbox')).toHaveValue('Test Project');
@@ -60,21 +60,23 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
-      expect(screen.getByRole('button', { name: /save project name/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument();
     });
 
     it('shows Cancel button in edit mode', async () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
-      // Use the specific aria-label to target the edit mode Cancel button
-      expect(screen.getByRole('button', { name: /cancel editing/i })).toBeInTheDocument();
+      // The cancel button in edit mode (icon button with aria-label="Cancel" and title)
+      const cancelButtons = screen.getAllByRole('button', { name: /^cancel$/i });
+      const editCancelButton = cancelButtons.find(btn => btn.getAttribute('title') === 'Cancel (Esc)');
+      expect(editCancelButton).toBeInTheDocument();
     });
 
     it('shows trash icon in edit mode when onDelete is provided', async () => {
@@ -87,8 +89,8 @@ describe('ProjectCard', () => {
         />
       );
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       // Look for the delete button in edit mode (trash icon)
       expect(screen.getByRole('button', { name: /delete project/i })).toBeInTheDocument();
@@ -98,14 +100,14 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const input = screen.getByRole('textbox');
       await user.clear(input);
       await user.type(input, 'New Project Name');
 
-      const saveButton = screen.getByRole('button', { name: /save project name/i });
+      const saveButton = screen.getByRole('button', { name: /^save$/i });
       await user.click(saveButton);
 
       expect(mockOnRename).toHaveBeenCalledWith(mockProject, 'New Project Name');
@@ -115,14 +117,16 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const input = screen.getByRole('textbox');
       await user.clear(input);
       await user.type(input, 'Changed Name');
 
-      const cancelButton = screen.getByRole('button', { name: /cancel editing/i });
+      // Find the cancel button with the title attribute (edit mode cancel)
+      const cancelButtons = screen.getAllByRole('button', { name: /^cancel$/i });
+      const cancelButton = cancelButtons.find(btn => btn.getAttribute('title') === 'Cancel (Esc)')!;
       await user.click(cancelButton);
 
       // Should exit edit mode without saving
@@ -135,8 +139,8 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const input = screen.getByRole('textbox');
       await user.clear(input);
@@ -149,8 +153,8 @@ describe('ProjectCard', () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const input = screen.getByRole('textbox');
       await user.clear(input);
@@ -172,8 +176,8 @@ describe('ProjectCard', () => {
         />
       );
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const deleteButton = screen.getByRole('button', { name: /delete project/i });
       await user.click(deleteButton);
@@ -192,8 +196,8 @@ describe('ProjectCard', () => {
         />
       );
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const deleteButton = screen.getByRole('button', { name: /delete project/i });
       await user.click(deleteButton);
@@ -218,8 +222,8 @@ describe('ProjectCard', () => {
         />
       );
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
       const deleteButton = screen.getByRole('button', { name: /delete project/i });
       await user.click(deleteButton);
@@ -245,26 +249,28 @@ describe('ProjectCard', () => {
       expect(card).toBeInTheDocument();
     });
 
-    it('Save button has primary teal styling', async () => {
+    it('Save button has teal hover styling', async () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
-      const saveButton = screen.getByRole('button', { name: /save project name/i });
-      expect(saveButton).toHaveClass('bg-teal-500');
+      const saveButton = screen.getByRole('button', { name: /^save$/i });
+      expect(saveButton).toHaveClass('hover:bg-teal-100');
     });
 
-    it('Cancel button has secondary gray styling', async () => {
+    it('Cancel button has gray hover styling', async () => {
       const user = userEvent.setup();
       render(<ProjectCard project={mockProject} onRename={mockOnRename} />);
 
-      const renameButton = screen.getByRole('button', { name: /rename/i });
-      await user.click(renameButton);
+      const editButton = screen.getByRole('button', { name: /edit project/i });
+      await user.click(editButton);
 
-      const cancelButton = screen.getByRole('button', { name: /cancel editing/i });
-      expect(cancelButton).toHaveClass('border-gray-300');
+      // Find the cancel button with the title attribute (edit mode cancel)
+      const cancelButtons = screen.getAllByRole('button', { name: /^cancel$/i });
+      const cancelButton = cancelButtons.find(btn => btn.getAttribute('title') === 'Cancel (Esc)');
+      expect(cancelButton).toHaveClass('hover:bg-gray-200');
     });
   });
 });
