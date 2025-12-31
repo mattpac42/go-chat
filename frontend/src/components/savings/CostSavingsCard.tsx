@@ -69,14 +69,25 @@ function formatCurrency(value: number): string {
 
 /**
  * Format time for display
+ * Shows "<1 min" for non-zero values that would round to 0
  */
 function formatTime(minutes: number, isHours: boolean = false): string {
   if (isHours) {
     const hours = minutes;
     if (hours < 1) {
-      return `${Math.round(hours * 60)} min`;
+      const mins = hours * 60;
+      // Show "<1 min" for non-zero values that round to 0
+      if (mins > 0 && Math.round(mins) === 0) {
+        return '<1 min';
+      }
+      return `${Math.round(mins)} min`;
     }
     return `${hours.toFixed(1)} hours`;
+  }
+
+  // Show "<1 min" for non-zero values that round to 0
+  if (minutes > 0 && Math.round(minutes) < 1) {
+    return '<1 min';
   }
 
   if (minutes < 60) {

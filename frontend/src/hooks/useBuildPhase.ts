@@ -48,18 +48,44 @@ export function useBuildPhase({
   const [showPhasedView, setShowPhasedView] = useState(false);
   const previousPhaseRef = useRef<BuildPhase>('discovery');
 
+  // Track the message count when discovery was completed
+  const discoveryCompleteAtRef = useRef<number>(-1);
+
+  // Update discovery complete index when discovery transitions to complete
+  useEffect(() => {
+    if (discoveryComplete && discoveryCompleteAtRef.current === -1) {
+      // Discovery just completed - remember the current message index
+      discoveryCompleteAtRef.current = messages.length - 1;
+    } else if (!discoveryComplete) {
+      // Discovery was reset
+      discoveryCompleteAtRef.current = -1;
+    }
+  }, [discoveryComplete, messages.length]);
+
+  // Calculate discovery complete index
+  const discoveryCompleteIndex = useMemo(() => {
+    if (!discoveryComplete) return -1;
+    // If we've tracked when discovery completed, use that
+    if (discoveryCompleteAtRef.current >= 0) {
+      return discoveryCompleteAtRef.current;
+    }
+    // Fallback: if discoveryComplete is true but we haven't tracked the index,
+    // all current messages are discovery (edge case on initial load)
+    return messages.length - 1;
+  }, [discoveryComplete, messages.length]);
+
   // Determine current phase
   const currentPhase = useMemo(() => {
     if (isDiscoveryMode && !discoveryComplete) {
       return 'discovery';
     }
-    return detectCurrentPhase(messages);
-  }, [messages, isDiscoveryMode, discoveryComplete]);
+    return detectCurrentPhase(messages, discoveryCompleteIndex);
+  }, [messages, isDiscoveryMode, discoveryComplete, discoveryCompleteIndex]);
 
   // Group messages by phase
   const messagesByPhase = useMemo(() => {
-    return groupMessagesByPhase(messages);
-  }, [messages]);
+    return groupMessagesByPhase(messages, discoveryCompleteIndex);
+  }, [messages, discoveryCompleteIndex]);
 
   // Determine completed phases
   const completedPhases = useMemo(() => {

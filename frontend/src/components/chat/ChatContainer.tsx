@@ -310,26 +310,16 @@ export function ChatContainer({
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Cost Savings Icon - shown when there are messages */}
           {messages.length > 0 && (
-            <>
-              <button
-                onClick={() => setShowWageSettings(true)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Wage Settings"
-                title="Configure hourly rates"
-              >
-                <SettingsIcon className="w-5 h-5" />
-              </button>
-              <CostSavingsIcon
-                metrics={{
-                  messageCount: messages.length,
-                  filesGenerated: 0,
-                  pmMessageCount: messages.filter(m => m.role === 'assistant' && (m.agentType === 'product_manager' || m.agentType === 'product')).length,
-                  designerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'designer').length,
-                  developerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'developer').length,
-                }}
-                storageKey={`cost-savings-${projectId}`}
-              />
-            </>
+            <CostSavingsIcon
+              metrics={{
+                messageCount: messages.length,
+                filesGenerated: 0,
+                pmMessageCount: messages.filter(m => m.role === 'assistant' && (m.agentType === 'product_manager' || m.agentType === 'product')).length,
+                designerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'designer').length,
+                developerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'developer').length,
+              }}
+              storageKey={`cost-savings-${projectId}`}
+            />
           )}
           {showViewSummaryButton && (
             <button
@@ -352,6 +342,17 @@ export function ChatContainer({
             reconnectAttempts={reconnectAttempts}
             onReconnect={reconnect}
           />
+          {/* Settings - shown when there are messages */}
+          {messages.length > 0 && (
+            <button
+              onClick={() => setShowWageSettings(true)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Wage Settings"
+              title="Configure hourly rates"
+            >
+              <SettingsIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </header>
 

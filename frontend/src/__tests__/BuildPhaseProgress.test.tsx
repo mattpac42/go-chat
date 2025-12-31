@@ -2,6 +2,11 @@ import {
   detectPhaseFromMessage,
   detectPhaseWithContext,
   groupMessagesByPhase,
+  detectPhaseMarker,
+  assignPhasesToMessages,
+  shouldShowPhaseToggle,
+  MIN_MESSAGES_FOR_PHASE_VIEW,
+  MIN_MESSAGES_PER_SECTION,
   BuildPhase,
 } from '@/components/chat/BuildPhaseProgress';
 import { Message } from '@/types';
@@ -21,7 +26,301 @@ function createMessage(
   };
 }
 
-describe('detectPhaseFromMessage', () => {
+describe('detectPhaseMarker', () => {
+  it('returns null for messages without phase markers', () => {
+    expect(detectPhaseMarker('Hello, this is a regular message')).toBeNull();
+    expect(detectPhaseMarker('Let me help you build something')).toBeNull();
+    expect(detectPhaseMarker('Here is some code: ```js\ncode\n```')).toBeNull();
+  });
+
+  it('detects [Beginning X phase] markers', () => {
+    expect(detectPhaseMarker('[Beginning planning phase]')).toBe('planning');
+    expect(detectPhaseMarker('[Beginning building phase]')).toBe('building');
+    expect(detectPhaseMarker('[Beginning testing phase]')).toBe('testing');
+    expect(detectPhaseMarker('[Beginning launch phase]')).toBe('launch');
+  });
+
+  it('detects [Entering X phase] markers', () => {
+    expect(detectPhaseMarker('[Entering planning phase]')).toBe('planning');
+    expect(detectPhaseMarker('[Entering building phase]')).toBe('building');
+    expect(detectPhaseMarker('[Entering testing phase]')).toBe('testing');
+    expect(detectPhaseMarker('[Entering launch phase]')).toBe('launch');
+  });
+
+  it('detects [Moving to X phase] markers', () => {
+    expect(detectPhaseMarker('[Moving to planning phase]')).toBe('planning');
+    expect(detectPhaseMarker('[Moving to building phase]')).toBe('building');
+    expect(detectPhaseMarker('[Moving to testing phase]')).toBe('testing');
+    expect(detectPhaseMarker('[Moving to launch phase]')).toBe('launch');
+  });
+
+  it('detects [Starting X phase] markers', () => {
+    expect(detectPhaseMarker('[Starting planning phase]')).toBe('planning');
+    expect(detectPhaseMarker('[Starting building phase]')).toBe('building');
+    expect(detectPhaseMarker('[Starting testing phase]')).toBe('testing');
+    expect(detectPhaseMarker('[Starting launch phase]')).toBe('launch');
+  });
+
+  it('is case-insensitive', () => {
+    expect(detectPhaseMarker('[BEGINNING PLANNING PHASE]')).toBe('planning');
+    expect(detectPhaseMarker('[Beginning Planning Phase]')).toBe('planning');
+    expect(detectPhaseMarker('[beginning BUILDING phase]')).toBe('building');
+  });
+
+  it('detects markers embedded in larger content', () => {
+    const content = 'Great! Now let me start coding.\n\n[Beginning building phase]\n\nHere is the implementation...';
+    expect(detectPhaseMarker(content)).toBe('building');
+  });
+
+  it('returns null for discovery phase markers (not valid post-discovery)', () => {
+    expect(detectPhaseMarker('[Beginning discovery phase]')).toBeNull();
+  });
+});
+
+describe('assignPhasesToMessages - Sticky Phase Logic', () => {
+  it('assigns discovery to all messages when discovery not complete', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Hello'),
+      createMessage('assistant', 'Hi there!'),
+      createMessage('user', 'What can you build?'),
+    ];
+
+    const phases = assignPhasesToMessages(messages, -1);
+    expect(phases).toEqual(['discovery', 'discovery', 'discovery']);
+  });
+
+  it('assigns discovery to all messages up to and including discoveryCompleteIndex', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Hello'),
+      createMessage('assistant', 'Hi there!'),
+      createMessage('user', 'Ready to build'),
+      createMessage('assistant', 'Let me plan this out'),
+    ];
+
+    // Discovery completed at index 1 (second message)
+    const phases = assignPhasesToMessages(messages, 1);
+    expect(phases[0]).toBe('discovery');
+    expect(phases[1]).toBe('discovery');
+    // Messages after discovery complete default to planning
+    expect(phases[2]).toBe('planning');
+    expect(phases[3]).toBe('planning');
+  });
+
+  it('defaults to planning for first post-discovery message without marker', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Define my app'),
+      createMessage('assistant', 'I understand'),
+      createMessage('user', 'Lets go'),
+      createMessage('assistant', 'Starting now'),
+    ];
+
+    const phases = assignPhasesToMessages(messages, 1);
+    // Post-discovery messages default to planning
+    expect(phases[2]).toBe('planning');
+    expect(phases[3]).toBe('planning');
+  });
+
+  it('uses phase marker when present', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Define my app'),
+      createMessage('assistant', 'I understand'),
+      createMessage('assistant', '[Beginning building phase]\n\nHere is code'),
+      createMessage('user', 'Looks good'),
+    ];
+
+    const phases = assignPhasesToMessages(messages, 1);
+    expect(phases[0]).toBe('discovery');
+    expect(phases[1]).toBe('discovery');
+    expect(phases[2]).toBe('building');
+    expect(phases[3]).toBe('building'); // Sticky - inherits from previous
+  });
+
+  it('implements sticky phase inheritance correctly', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Requirements'),
+      createMessage('assistant', 'Discovery complete'),
+      createMessage('assistant', '[Beginning planning phase]'),
+      createMessage('user', 'Good plan'),
+      createMessage('assistant', 'Thanks'),
+      createMessage('assistant', '[Beginning building phase]'),
+      createMessage('user', 'Nice code'),
+      createMessage('assistant', 'More code'),
+      createMessage('user', 'Test it'),
+      createMessage('assistant', '[Beginning testing phase]'),
+      createMessage('user', 'All tests pass'),
+    ];
+
+    const phases = assignPhasesToMessages(messages, 1);
+
+    // Discovery phase
+    expect(phases[0]).toBe('discovery');
+    expect(phases[1]).toBe('discovery');
+    // Planning phase (marked + sticky)
+    expect(phases[2]).toBe('planning');
+    expect(phases[3]).toBe('planning');
+    expect(phases[4]).toBe('planning');
+    // Building phase (marked + sticky)
+    expect(phases[5]).toBe('building');
+    expect(phases[6]).toBe('building');
+    expect(phases[7]).toBe('building');
+    expect(phases[8]).toBe('building');
+    // Testing phase (marked + sticky)
+    expect(phases[9]).toBe('testing');
+    expect(phases[10]).toBe('testing');
+  });
+
+  it('handles transition between all phases', () => {
+    const messages: Message[] = [
+      createMessage('assistant', 'Welcome'),
+      createMessage('assistant', '[Beginning planning phase]'),
+      createMessage('assistant', '[Beginning building phase]'),
+      createMessage('assistant', '[Beginning testing phase]'),
+      createMessage('assistant', '[Beginning launch phase]'),
+    ];
+
+    const phases = assignPhasesToMessages(messages, 0);
+
+    expect(phases[0]).toBe('discovery');
+    expect(phases[1]).toBe('planning');
+    expect(phases[2]).toBe('building');
+    expect(phases[3]).toBe('testing');
+    expect(phases[4]).toBe('launch');
+  });
+});
+
+describe('groupMessagesByPhase with sticky phases', () => {
+  it('groups all messages as discovery when discovery not complete', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Hello'),
+      createMessage('assistant', 'Hi'),
+      createMessage('user', 'Help me'),
+    ];
+
+    const groups = groupMessagesByPhase(messages, -1);
+    const discoveryMessages = groups.get('discovery') || [];
+
+    expect(discoveryMessages.length).toBe(3);
+    expect(groups.get('planning')?.length || 0).toBe(0);
+  });
+
+  it('separates discovery from post-discovery phases', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Requirements'),
+      createMessage('assistant', 'Understood'),
+      createMessage('user', 'Start building'),
+      createMessage('assistant', '[Beginning building phase]\n```code```'),
+    ];
+
+    const groups = groupMessagesByPhase(messages, 1);
+
+    // Discovery has 2 messages
+    // Post-discovery: 1 user message (planning by default) + 1 building marker message
+    // Planning has only 1 message, so it gets merged into discovery (min section size = 2)
+    // Building has only 1 message, so it gets merged into the previous non-empty phase
+    // Result: discovery gets planning merged, then building gets merged
+    // This results in 4 messages in discovery
+    expect(groups.get('discovery')?.length).toBe(4);
+    expect(groups.get('planning')?.length).toBe(0);
+    expect(groups.get('building')?.length).toBe(0);
+  });
+
+  it('uses sticky inheritance for grouping', () => {
+    const messages: Message[] = [
+      createMessage('assistant', 'Discovery done'),
+      createMessage('assistant', '[Beginning building phase]'),
+      createMessage('user', 'Continue'),
+      createMessage('assistant', 'More code'),
+      createMessage('user', 'And more'),
+    ];
+
+    const groups = groupMessagesByPhase(messages, 0);
+
+    const buildingMessages = groups.get('building') || [];
+    // 4 messages after discovery: all should be in building (marker + sticky)
+    expect(buildingMessages.length).toBe(4);
+  });
+});
+
+describe('shouldShowPhaseToggle', () => {
+  it('returns false when discovery not complete', () => {
+    expect(shouldShowPhaseToggle(false, 15)).toBe(false);
+    expect(shouldShowPhaseToggle(false, 100)).toBe(false);
+  });
+
+  it('returns false when fewer than MIN_MESSAGES_FOR_PHASE_VIEW messages', () => {
+    expect(shouldShowPhaseToggle(true, 0)).toBe(false);
+    expect(shouldShowPhaseToggle(true, 5)).toBe(false);
+    expect(shouldShowPhaseToggle(true, MIN_MESSAGES_FOR_PHASE_VIEW - 1)).toBe(false);
+  });
+
+  it('returns true when discovery complete AND enough messages', () => {
+    expect(shouldShowPhaseToggle(true, MIN_MESSAGES_FOR_PHASE_VIEW)).toBe(true);
+    expect(shouldShowPhaseToggle(true, MIN_MESSAGES_FOR_PHASE_VIEW + 1)).toBe(true);
+    expect(shouldShowPhaseToggle(true, 50)).toBe(true);
+  });
+
+  it('uses correct constant for minimum messages (10)', () => {
+    expect(MIN_MESSAGES_FOR_PHASE_VIEW).toBe(10);
+    expect(shouldShowPhaseToggle(true, 9)).toBe(false);
+    expect(shouldShowPhaseToggle(true, 10)).toBe(true);
+  });
+});
+
+describe('minimum section size enforcement', () => {
+  it('exports MIN_MESSAGES_PER_SECTION constant as 2', () => {
+    expect(MIN_MESSAGES_PER_SECTION).toBe(2);
+  });
+
+  it('merges small sections into previous phase', () => {
+    const messages: Message[] = [
+      // Discovery: 3 messages
+      createMessage('user', 'Req 1'),
+      createMessage('assistant', 'Got it'),
+      createMessage('assistant', 'Summary'),
+      // Planning: 1 message (should merge into discovery)
+      createMessage('assistant', '[Beginning planning phase]'),
+      // Building: 3 messages
+      createMessage('assistant', '[Beginning building phase]'),
+      createMessage('user', 'Looks good'),
+      createMessage('assistant', 'More code'),
+    ];
+
+    const groups = groupMessagesByPhase(messages, 2);
+
+    // Planning has only 1 message, should be merged into discovery
+    const discoveryMessages = groups.get('discovery') || [];
+    const planningMessages = groups.get('planning') || [];
+    const buildingMessages = groups.get('building') || [];
+
+    // Discovery (3) + Planning merged (1) = 4
+    expect(discoveryMessages.length).toBe(4);
+    expect(planningMessages.length).toBe(0);
+    expect(buildingMessages.length).toBe(3);
+  });
+
+  it('keeps sections with 2 or more messages separate', () => {
+    const messages: Message[] = [
+      createMessage('user', 'Req'),
+      createMessage('assistant', 'Got it'),
+      createMessage('assistant', '[Beginning planning phase]'),
+      createMessage('user', 'Plan question'),
+      createMessage('assistant', '[Beginning building phase]'),
+      createMessage('user', 'Build'),
+    ];
+
+    const groups = groupMessagesByPhase(messages, 1);
+
+    const planningMessages = groups.get('planning') || [];
+    const buildingMessages = groups.get('building') || [];
+
+    // Planning has 2 messages, building has 2 messages - both should stay
+    expect(planningMessages.length).toBe(2);
+    expect(buildingMessages.length).toBe(2);
+  });
+});
+
+// Legacy tests - kept for backwards compatibility with deprecated functions
+describe('detectPhaseFromMessage (deprecated)', () => {
   it('detects discovery phase for generic messages', () => {
     const message = createMessage('user', 'Hello, I need help with my app');
     expect(detectPhaseFromMessage(message)).toBe('discovery');
@@ -60,7 +359,7 @@ describe('detectPhaseFromMessage', () => {
   });
 });
 
-describe('detectPhaseWithContext', () => {
+describe('detectPhaseWithContext (deprecated)', () => {
   it('returns detected phase for assistant messages', () => {
     const messages: Message[] = [
       createMessage('assistant', 'Here is the architecture'),
@@ -80,19 +379,7 @@ describe('detectPhaseWithContext', () => {
       createMessage('user', 'Sounds good, go ahead'),
       createMessage('assistant', 'Creating the component:\n```jsx\ncode\n```'),
     ];
-    // User message has no keywords but following assistant is in building phase
     expect(detectPhaseWithContext(messages, 0)).toBe('building');
-  });
-
-  it('skips over other user messages to find assistant', () => {
-    const messages: Message[] = [
-      createMessage('user', 'First message'),
-      createMessage('user', 'Second message'),
-      createMessage('assistant', 'Running tests now'),
-    ];
-    // Both user messages should inherit testing from assistant
-    expect(detectPhaseWithContext(messages, 0)).toBe('testing');
-    expect(detectPhaseWithContext(messages, 1)).toBe('testing');
   });
 
   it('returns discovery if no following assistant message', () => {
@@ -100,140 +387,6 @@ describe('detectPhaseWithContext', () => {
       createMessage('assistant', 'Here is the code:\n```js\ncode\n```'),
       createMessage('user', 'What else can you do?'),
     ];
-    // Last user message has no following assistant
     expect(detectPhaseWithContext(messages, 1)).toBe('discovery');
-  });
-});
-
-describe('groupMessagesByPhase', () => {
-  it('groups messages correctly by phase keywords', () => {
-    const messages: Message[] = [
-      createMessage('user', 'What can you help me with?'),
-      createMessage('assistant', 'I can help you build an app'),
-      createMessage(
-        'assistant',
-        'Here is the architecture for your solution'
-      ),
-    ];
-
-    const groups = groupMessagesByPhase(messages);
-
-    // All phases should be initialized
-    expect(groups.has('discovery')).toBe(true);
-    expect(groups.has('planning')).toBe(true);
-    expect(groups.has('building')).toBe(true);
-    expect(groups.has('testing')).toBe(true);
-    expect(groups.has('launch')).toBe(true);
-  });
-
-  describe('context inheritance for user messages', () => {
-    it('inherits phase from following assistant message when user message has no keywords', () => {
-      const messages: Message[] = [
-        createMessage('user', 'Can you write the login function?'),
-        createMessage(
-          'assistant',
-          'Here is the implementation:\n```typescript\nfunction login() {}\n```'
-        ),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      // User message should be in 'building' phase (inherited from assistant response)
-      // not 'discovery' (which would happen if keyword matching failed)
-      const buildingMessages = groups.get('building') || [];
-      const discoveryMessages = groups.get('discovery') || [];
-
-      expect(buildingMessages.length).toBe(2);
-      expect(buildingMessages[0].role).toBe('user');
-      expect(buildingMessages[1].role).toBe('assistant');
-      expect(discoveryMessages.length).toBe(0);
-    });
-
-    it('inherits testing phase from following assistant message', () => {
-      const messages: Message[] = [
-        createMessage('user', 'Please make sure it works'),
-        createMessage('assistant', 'Running tests now to verify everything'),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      const testingMessages = groups.get('testing') || [];
-      expect(testingMessages.length).toBe(2);
-      expect(testingMessages[0].role).toBe('user');
-    });
-
-    it('inherits planning phase from following assistant message', () => {
-      const messages: Message[] = [
-        createMessage('user', 'What should we build first?'),
-        createMessage(
-          'assistant',
-          'Let me describe the architecture for this'
-        ),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      const planningMessages = groups.get('planning') || [];
-      expect(planningMessages.length).toBe(2);
-      expect(planningMessages[0].role).toBe('user');
-    });
-
-    it('handles multiple conversation turns with correct phase inheritance', () => {
-      const messages: Message[] = [
-        // Discovery phase
-        createMessage('user', 'I want to build a todo app'),
-        createMessage('assistant', 'Great! Let me understand your requirements'),
-        // Planning phase
-        createMessage('user', 'What do you suggest?'),
-        createMessage('assistant', 'Here is the architecture I recommend'),
-        // Building phase
-        createMessage('user', 'Looks good, go ahead'),
-        createMessage('assistant', 'Creating the component:\n```jsx\nfunction TodoList() {}\n```'),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      const discoveryMessages = groups.get('discovery') || [];
-      const planningMessages = groups.get('planning') || [];
-      const buildingMessages = groups.get('building') || [];
-
-      // First two messages in discovery
-      expect(discoveryMessages.length).toBe(2);
-      // Next two in planning
-      expect(planningMessages.length).toBe(2);
-      // Last two in building
-      expect(buildingMessages.length).toBe(2);
-    });
-
-    it('keeps user message in discovery if no assistant message follows', () => {
-      const messages: Message[] = [
-        createMessage('assistant', 'Here is the implementation:\n```js\ncode\n```'),
-        createMessage('user', 'What about adding more features?'),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      const buildingMessages = groups.get('building') || [];
-      const discoveryMessages = groups.get('discovery') || [];
-
-      // Assistant message in building
-      expect(buildingMessages.length).toBe(1);
-      // User message at end stays in discovery (no following assistant to inherit from)
-      expect(discoveryMessages.length).toBe(1);
-      expect(discoveryMessages[0].role).toBe('user');
-    });
-
-    it('preserves user messages that have actual phase keywords', () => {
-      const messages: Message[] = [
-        createMessage('user', 'Can you test the implementation?'),
-        createMessage('assistant', 'Running the test suite now'),
-      ];
-
-      const groups = groupMessagesByPhase(messages);
-
-      const testingMessages = groups.get('testing') || [];
-      // Both should be in testing - user message has 'test' keyword
-      expect(testingMessages.length).toBe(2);
-    });
   });
 });

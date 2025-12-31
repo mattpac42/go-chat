@@ -12,6 +12,10 @@ export interface PhaseInfo {
   description: string;
 }
 
+// Constants for phase view visibility and grouping
+export const MIN_MESSAGES_FOR_PHASE_VIEW = 10;
+export const MIN_MESSAGES_PER_SECTION = 2;
+
 const PHASES: PhaseInfo[] = [
   {
     phase: 'discovery',
@@ -50,8 +54,37 @@ export function getPhaseIndex(phase: BuildPhase): number {
 }
 
 /**
+ * Detect explicit phase marker in message content.
+ * Root will emit phase transitions like:
+ * - [Beginning planning phase]
+ * - [Entering building phase]
+ * - [Moving to testing phase]
+ * - [Starting launch phase]
+ */
+export function detectPhaseMarker(content: string): BuildPhase | null {
+  // Pattern: [Beginning/Entering/Moving to/Starting X phase]
+  const patterns = [
+    /\[(?:beginning|entering|moving to|starting)\s+(planning|building|testing|launch)\s+phase\]/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match) {
+      const phase = match[1].toLowerCase() as BuildPhase;
+      // Validate it's a valid phase
+      if (['planning', 'building', 'testing', 'launch'].includes(phase)) {
+        return phase;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Detect the current build phase based on message content.
  * Uses simple heuristics to determine which phase we're in.
+ * @deprecated Use sticky phase logic via groupMessagesByPhase instead
  */
 export function detectPhaseFromMessage(message: Message): BuildPhase {
   const content = message.content.toLowerCase();
@@ -109,24 +142,75 @@ export function detectPhaseFromMessage(message: Message): BuildPhase {
 }
 
 /**
- * Detect the current overall phase from all messages
+ * Detect the current overall phase from all messages using sticky phase logic.
+ * Returns the phase of the last message in the conversation.
  */
-export function detectCurrentPhase(messages: Message[]): BuildPhase {
+export function detectCurrentPhase(
+  messages: Message[],
+  discoveryCompleteIndex?: number
+): BuildPhase {
   if (messages.length === 0) return 'discovery';
 
-  // Check the last few messages to determine current phase
-  const recentMessages = messages.slice(-5);
-  const phases = recentMessages.map(detectPhaseFromMessage);
+  // Assign phases to all messages using sticky logic
+  const phases = assignPhasesToMessages(messages, discoveryCompleteIndex ?? -1);
 
-  // Return the highest (most advanced) phase detected
-  const phaseIndices = phases.map(getPhaseIndex);
-  const maxIndex = Math.max(...phaseIndices);
-  return PHASES[maxIndex].phase;
+  // Return the phase of the last message
+  return phases[phases.length - 1];
+}
+
+/**
+ * Assign phases to all messages using sticky phase inheritance.
+ *
+ * Rules:
+ * 1. All messages before discovery_complete -> phase = 'discovery'
+ * 2. After discovery_complete:
+ *    a. Check for explicit phase marker in message -> use that phase
+ *    b. No marker? -> inherit phase from previous message
+ *    c. First post-discovery message with no marker? -> default to 'planning'
+ */
+export function assignPhasesToMessages(
+  messages: Message[],
+  discoveryCompleteIndex: number
+): BuildPhase[] {
+  const phases: BuildPhase[] = [];
+  let currentPhase: BuildPhase = 'discovery';
+  let postDiscoveryStarted = false;
+
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+
+    // Before discovery complete, everything is discovery
+    if (discoveryCompleteIndex < 0 || i <= discoveryCompleteIndex) {
+      phases.push('discovery');
+      continue;
+    }
+
+    // Post-discovery: check for explicit phase marker
+    const markerPhase = detectPhaseMarker(message.content);
+    if (markerPhase) {
+      currentPhase = markerPhase;
+      phases.push(currentPhase);
+      postDiscoveryStarted = true;
+      continue;
+    }
+
+    // No marker: inherit from previous or default to 'planning'
+    if (!postDiscoveryStarted) {
+      // First post-discovery message with no marker defaults to planning
+      currentPhase = 'planning';
+      postDiscoveryStarted = true;
+    }
+    // Otherwise currentPhase stays the same (sticky)
+    phases.push(currentPhase);
+  }
+
+  return phases;
 }
 
 /**
  * Detect phase with context - for user messages that default to 'discovery',
  * inherit the phase from the following assistant message if available.
+ * @deprecated Use assignPhasesToMessages with sticky phase logic instead
  */
 export function detectPhaseWithContext(
   messages: Message[],
@@ -154,22 +238,83 @@ export function detectPhaseWithContext(
 }
 
 /**
- * Group messages by their detected phase
+ * Group messages by their detected phase using sticky phase inheritance.
+ *
+ * @param messages - All messages in the conversation
+ * @param discoveryCompleteIndex - Index of the last discovery message (-1 if not complete)
+ * @returns Map of phases to messages, with minimum section size enforcement
  */
-export function groupMessagesByPhase(messages: Message[]): Map<BuildPhase, Message[]> {
+export function groupMessagesByPhase(
+  messages: Message[],
+  discoveryCompleteIndex: number = -1
+): Map<BuildPhase, Message[]> {
   const groups = new Map<BuildPhase, Message[]>();
 
   // Initialize all phases with empty arrays
   PHASES.forEach((p) => groups.set(p.phase, []));
 
+  if (messages.length === 0) {
+    return groups;
+  }
+
+  // Assign phases using sticky logic
+  const phases = assignPhasesToMessages(messages, discoveryCompleteIndex);
+
+  // Group messages by their assigned phase
   messages.forEach((message, index) => {
-    const phase = detectPhaseWithContext(messages, index);
+    const phase = phases[index];
     const existing = groups.get(phase) || [];
     existing.push(message);
     groups.set(phase, existing);
   });
 
-  return groups;
+  // Enforce minimum section size by merging small sections into previous
+  return enforceMinimumSectionSize(groups);
+}
+
+/**
+ * Merge sections with fewer than MIN_MESSAGES_PER_SECTION messages into the previous section.
+ */
+function enforceMinimumSectionSize(
+  groups: Map<BuildPhase, Message[]>
+): Map<BuildPhase, Message[]> {
+  const phaseOrder: BuildPhase[] = ['discovery', 'planning', 'building', 'testing', 'launch'];
+  const result = new Map<BuildPhase, Message[]>();
+
+  // Initialize empty arrays for all phases
+  phaseOrder.forEach(p => result.set(p, []));
+
+  let previousPhaseWithMessages: BuildPhase | null = null;
+
+  for (const phase of phaseOrder) {
+    const messages = groups.get(phase) || [];
+
+    if (messages.length === 0) {
+      continue;
+    }
+
+    if (messages.length < MIN_MESSAGES_PER_SECTION && previousPhaseWithMessages) {
+      // Merge into previous phase
+      const previousMessages = result.get(previousPhaseWithMessages) || [];
+      result.set(previousPhaseWithMessages, [...previousMessages, ...messages]);
+    } else {
+      result.set(phase, messages);
+      previousPhaseWithMessages = phase;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Check if phase view toggle should be visible.
+ * Only show when discovery is complete AND at least MIN_MESSAGES_FOR_PHASE_VIEW messages exist.
+ */
+export function shouldShowPhaseToggle(
+  discoveryComplete: boolean,
+  messageCount: number
+): boolean {
+  return discoveryComplete && messageCount >= MIN_MESSAGES_FOR_PHASE_VIEW;
 }
 
 interface BuildPhaseProgressProps {
@@ -199,13 +344,16 @@ export function BuildPhaseProgress({
 
   const currentIndex = getPhaseIndex(currentPhase);
 
+  // Determine if toggle should be visible (10+ messages and discovery complete)
+  const showToggle = shouldShowPhaseToggle(discoveryComplete, messages.length);
+
   return (
     <div className="w-full bg-white border-b border-gray-200 px-4 py-3">
       <div className="max-w-4xl mx-auto">
         {/* Desktop view */}
         <div className="hidden md:flex items-center gap-4">
-          {/* View segmented control */}
-          {onTogglePhasedView && (
+          {/* View segmented control - only show after 10 messages AND discovery complete */}
+          {onTogglePhasedView && showToggle && (
             <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5">
               <button
                 onClick={() => showPhasedView && onTogglePhasedView()}
