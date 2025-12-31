@@ -41,12 +41,25 @@ Context: 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛ 
 
 ## Delegation Decision
 
-Ask three questions:
+Ask four questions:
 1. Is this specialized work? → Delegate
 2. Will this use >10k tokens? → Delegate
 3. Is this my third attempt? → Delegate
+4. Are there 2+ independent tasks? → Delegate in **PARALLEL**
 
-If NO to all three → Handle directly
+If NO to all four → Handle directly
+
+## Parallel Execution
+
+**Default to parallel when possible.** Each agent has its own 200k context window.
+
+**Parallelize when:**
+- Multiple independent research tasks
+- Different domains (e.g., frontend + backend + infra)
+- Unrelated file changes
+- Reviews or analysis of separate components
+
+**Invoke parallel agents in a SINGLE message with multiple Task tool calls.**
 
 ---
 

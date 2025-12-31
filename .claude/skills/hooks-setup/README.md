@@ -15,7 +15,7 @@ Run this skill once to set up hooks, then manually update `.claude/settings.json
 
 ## Quick Setup
 
-1. Read `.garden/skills/hooks-setup/SKILL.md`
+1. Read `.claude/skills/hooks-setup/SKILL.md`
 2. Copy JSON configuration from skill document
 3. Update `.claude/settings.json`
 4. Ensure scripts are executable (already done by skill)
@@ -33,5 +33,5 @@ Run this skill once to set up hooks, then manually update `.claude/settings.json
 
 ## Related
 
-- Context Display: `.garden/skills/context-display/`
-- Context Tracker: `.garden/scripts/context-tracker.py`
+- Context Display: `.claude/skills/context-display/`
+- Context Tracker: `.claude/scripts/context-tracker.py`

@@ -49,6 +49,10 @@ Before starting, verify you have:
 - **[agent-name]**: [When/why to hand off]
 - **[agent-name]**: [When/why to hand off]
 
+**Parallel-safe with**: [List agents that can run simultaneously with this one]
+
+*Note: Main agent should invoke parallel-safe agents in a SINGLE message when tasks are independent.*
+
 ## Deliverables
 
 - [Primary deliverable] - always

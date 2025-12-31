@@ -4,7 +4,7 @@ Garden CLI - Command-line interface for Garden 2.0
 
 Usage:
     garden list                 List installed plugins
-    garden agents               List available agents from gnomes/
+    garden agents               List available agents from marketplace/
     garden status               Show Garden status
     garden validate             Validate Garden setup
     garden context              Show context usage
@@ -147,24 +147,24 @@ def cmd_list():
     return 0
 
 def cmd_agents():
-    """List available agents from gnomes/"""
+    """List available agents from marketplace/"""
     if not GARDEN_ROOT:
         print("❌ No .garden folder found")
         return 1
 
-    # Look for gnomes/agents relative to project root
+    # Look for marketplace/agents relative to project root
     project_root = GARDEN_ROOT.parent
-    gnomes_agents = project_root / 'gnomes' / 'agents'
+    marketplace_agents = project_root / 'marketplace' / 'agents'
 
-    if not gnomes_agents.exists():
-        print("❌ gnomes/agents/ folder not found")
+    if not marketplace_agents.exists():
+        print("❌ marketplace/agents/ folder not found")
         return 1
 
-    agents = list(gnomes_agents.glob('*.md'))
+    agents = list(marketplace_agents.glob('*.md'))
     agents = [a for a in agents if a.name not in ['README.md', 'RECRUITMENT-CREW-README.md']]
 
     print(f"🤖 Available Agents ({len(agents)} total):")
-    print(f"   Location: {gnomes_agents}")
+    print(f"   Location: {marketplace_agents}")
     print()
 
     # Group by prefix

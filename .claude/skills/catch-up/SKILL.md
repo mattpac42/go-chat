@@ -1,38 +1,88 @@
 ---
 name: catch-up
-description: Restore session context from previous handoff. Use when a new conversation starts and HANDOFF-SESSION.md exists in .claude/work/history/, or when Claude needs to understand what was being worked on in a previous session. Triggers automatically at session start.
+description: Restore session context from previous handoff. Use at session start when HANDOFF-SESSION.md exists. For PRD-based work, use beads context instead. Triggers on "catch up", "continue session", "what was I working on".
 ---
 
-# Catch-Up
+# Session Catch-Up
 
-Restore context from previous session to enable seamless work continuation.
+Restore context from previous handoff session.
+
+## When to Use
+
+- **Session start** when `HANDOFF-SESSION.md` exists
+- **Resuming ad-hoc work** not tracked in beads
+- **User asks** "what was I working on?"
+
+**For PRD-based work**: Use `beads context` instead
 
 ## Workflow
 
-1. Check for `.claude/work/history/HANDOFF-SESSION.md`
-2. If exists, read and parse the handoff file
-3. Extract: last task, pending items, key decisions, critical files
-4. Present summary to user
-5. Confirm understanding before proceeding
+1. **Check for Handoff File**:
+   ```
+   .claude/work/history/HANDOFF-SESSION.md
+   ```
 
-## Output Format
+2. **If Found**:
+   - Read handoff file
+   - Summarize key context
+   - List pending work
+   - Identify files to review
+
+3. **If Not Found**:
+   - Check for beads: `beads context`
+   - If no beads, start fresh session
+
+4. **Present to User**:
+   - Brief summary of previous session
+   - What needs to continue
+   - Suggested first action
+
+## Context Restoration
+
+```markdown
+## Previous Session Summary
+
+**From**: Session [NNN] on YYYY-MM-DD
+
+### Continue With
+[Immediate next step from handoff]
+
+### Key Context
+[Essential background]
+
+### Pending Items
+- [ ] [Item 1]
+- [ ] [Item 2]
+
+### Files to Review
+- `path/to/file` - [why it matters]
+```
+
+## Decision Tree
 
 ```
-Restored from Session [XXX]:
-
-Last Working On:
-- [task description]
-
-Pending Items:
-- [item 1]
-- [item 2]
-
-Ready to continue. What would you like to focus on?
+Session Start:
+  ├── HANDOFF-SESSION.md exists?
+  │   └── YES → Read and summarize (catch-up)
+  │   └── NO → Check beads
+  │       ├── .beads/issues.jsonl exists?
+  │       │   └── YES → Run beads context
+  │       │   └── NO → Fresh session
 ```
 
-## Fallback
+## After Catch-Up
 
-If no handoff file exists:
-- Check `.claude/work/2_active/` for active tasks
-- Load `PROJECT_CONTEXT.md` for project context
-- Offer to start fresh
+Once context is restored:
+1. User confirms understanding
+2. Continue with pending work
+3. Use handoff again at session end (if not switching to beads)
+
+## Relationship to Beads
+
+| Check | Result |
+|-------|--------|
+| Handoff file exists | Use catch-up |
+| Beads initialized | Use `beads context` |
+| Neither | Fresh session |
+
+Both systems can coexist. Catch-up handles ad-hoc work, beads handles PRD-tracked work.

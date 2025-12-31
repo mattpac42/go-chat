@@ -126,7 +126,7 @@ Context: 🟩🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛ 40
 │   └── plugins.json  # Plugin configuration
 └── plugins/          # Installed extensions
 
-gnomes/
+marketplace/
 └── agents/           # 130+ specialized agents (production work)
 ```
 
@@ -135,7 +135,7 @@ gnomes/
 | Library | When to Use |
 |---------|-------------|
 | `.claude/agents/` | Quick fixes, prototyping, simple tasks |
-| `gnomes/agents/` | Production features, complex work, clear phases |
+| `marketplace/agents/` | Production features, complex work, clear phases |
 
 **Specialized agents** use tactical/strategic pairs for precise role separation.
 

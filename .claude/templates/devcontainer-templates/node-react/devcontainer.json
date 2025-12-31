@@ -7,12 +7,15 @@
   ],
 
   "containerEnv": {
-    "NODE_ENV": "development"
+    "NODE_ENV": "development",
+    "PULSE_SERVER": "host.containers.internal"
   },
 
   "postCreateCommand": ".devcontainer/setup.sh",
 
-  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Run: claude auth login' && echo 'Start: npm run dev'",
+  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Start: npm run dev'",
+
+  "postAttachCommand": "claude --dangerously-skip-permissions",
 
   "customizations": {
     "vscode": {

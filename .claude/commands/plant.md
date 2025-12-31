@@ -201,6 +201,31 @@ Briefly describe the project (1-2 sentences):
 
 Default to: "A [type] project rooted from The Garden"
 
+**Step 2.5: Complexity Detection**
+
+After receiving the description, assess whether the project seems more complex than the type defaults would cover. Look for indicators like:
+
+- Multiple systems or integrations mentioned
+- Infrastructure concerns (CI/CD, containers, deployment)
+- Full-stack or cross-cutting work
+- External service integrations
+- Words like "wrapper", "integration", "enterprise", "platform"
+
+**If complexity is detected**, prompt the user:
+
+```
+Your project description suggests this may be more complex than a typical [type] project.
+
+Would you like to:
+A) Add more agents beyond the defaults
+B) Include tactical/strategic pairs for deeper coverage
+C) Keep the defaults for now (can add more later)
+
+Select [A-C]:
+```
+
+If user selects A or B, proceed to show the full agent library in Phase 2.
+
 ### 3. Phase 2: Domain Selection
 
 Show default agents for the selected type and allow adjustments:
@@ -216,21 +241,26 @@ Default Agents:
 Additional agents available:
   [ ] platform-tactical - Infrastructure hands-on work
   [ ] platform-strategic - Cloud strategy and planning
-  [ ] product - Requirements, PRDs, feature planning
+  [ ] software-tactical - Hands-on code implementation
+  [ ] software-strategic - Architecture and technical direction
+  [ ] product-manager-tactical - Sprint execution
+  [ ] product-manager-strategic - Roadmap and strategy
   [ ] researcher - Analysis, exploration
   [ ] cicd-tactical - Pipeline implementation
-  [ ] (more available in gnomes/agents/)
+  [ ] (more available in marketplace/agents/)
 
 Options:
 A) Accept recommended agents
 B) Add more agents
 C) Remove agents
-D) Browse gnomes/agents/ library
+D) Browse marketplace/agents/ library
 
 Select [A-D]:
 ```
 
-If user selects B or D, show available agents from gnomes/agents/ directory.
+If user selects B or D, show available agents from marketplace/agents/ directory.
+
+**Note**: If user indicated interest in more agents during Step 2.5 (complexity detection), start with the full agent list visible and guide them through selection.
 
 ### 4. Phase 3: Manifest Confirmation
 

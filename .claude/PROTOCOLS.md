@@ -48,32 +48,80 @@ Success: [completion criteria]
 
 ## Parallel Execution
 
+**Priority: PARALLEL BY DEFAULT.** Each agent runs in its own 200k context window.
+
+### When to Parallelize
+
 ```yaml
 parallel_when:
-  - independent_research
-  - multi_domain_work
-  - unrelated_files
+  - independent_research_tasks
+  - multi_domain_work (frontend + backend + infra)
+  - unrelated_file_changes
+  - separate_component_reviews
+  - multi_agent_analysis (security + performance + architecture)
 
 sequential_when:
-  - output_dependencies
+  - output_dependencies (agent B needs agent A's output)
   - same_file_edits
-  - ordered_operations
+  - ordered_operations (build before deploy)
 ```
 
-## Skills (Auto-Invoked)
+### How to Invoke Parallel Agents
+
+**CRITICAL**: Use a SINGLE message with multiple Task tool calls.
+
+```
+User: "Add authentication and update the API docs"
+
+Main Agent Response (SINGLE message):
+  → Task tool: developer agent (implement auth)
+  → Task tool: researcher agent (update docs)
+
+Both agents run SIMULTANEOUSLY in separate contexts.
+```
+
+### Parallel Patterns
+
+| Pattern | Agents | Use Case |
+|---------|--------|----------|
+| **Star** | 3-5 independent | Reviews, research, parallel features |
+| **Pipeline** | 2-3 sequential | Build → test → deploy |
+| **Hybrid** | Mix | Strategic planning + tactical execution |
+
+### Swarm Execution (Advanced)
+
+For complex multi-faceted work, invoke 3-5 agents simultaneously:
+
+```
+Complex Feature Request:
+  → architect (design)
+  → developer (implementation plan)
+  → platform (infra requirements)
+  → researcher (prior art)
+
+All in ONE message. Main agent synthesizes results.
+```
+
+### Anti-Patterns
+
+- Invoking agents one-at-a-time when independent
+- Waiting for agent A before invoking unrelated agent B
+- Main agent doing research that could parallelize
+
+## Skills
 
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| catch-up | Session start | Restore context |
-| agent-session-summary | Agent exit | Document work |
+| beads | Session start/end | Execution state tracking |
 | context-display | Every response | Show usage |
 | setup-validation | Project init | Verify environment |
+| task-generate | PRD approved | Create tasks from PRD |
+| prd-create | Feature planning | Create PRD documents |
 
 ## Commands (User-Invoked)
 
 | Command | Purpose |
 |---------|---------|
-| /handoff | Session transition |
 | /commit | Git commit workflow |
 | /mr | Merge request creation |
 
@@ -85,8 +133,10 @@ work/
 ├── 0_vision/   # Strategic vision
 ├── 1_backlog/  # Ready for development
 ├── 2_active/   # In progress
-├── 3_done/     # Completed
-└── history/    # Session logs
+└── 3_done/     # Completed
+
+.beads/
+└── issues.jsonl  # Execution state (replaces history/)
 ```
 
 ### Task Lifecycle
@@ -130,17 +180,29 @@ C) Alternative: [approach]
 Recommendation: [analysis]
 ```
 
-## Session Continuity
+## Session Continuity (Beads)
 
-### Handoff Files
-- `SESSION-[XXX].md` - Session summary
-- `HANDOFF-SESSION.md` - Next session context
+Session state is tracked via beads, not handoff files.
 
-### Required at 75%
-1. Create session summary
-2. Create handoff file
-3. Document pending work
-4. Note key decisions
+### Session Start
+```bash
+python .claude/skills/beads/scripts/beads.py context
+```
+Shows in-progress, ready, and blocked beads.
+
+### Session End
+```bash
+# Close completed work
+python .claude/skills/beads/scripts/beads.py close <id> --note "Done"
+
+# Commit beads state
+git add .beads/ && git commit -m "Update beads state"
+```
+
+### At 75% Context
+1. Close/update relevant beads
+2. Commit `.beads/` changes
+3. Context bar shows usage - start new session if needed
 
 ## Plugin System
 
@@ -162,7 +224,7 @@ Recommendation: [analysis]
 ├── templates/        # Boilerplate
 └── docs/             # Documentation
 
-gnomes/
+marketplace/
 └── agents/           # 130+ specialized agents
 ```
 

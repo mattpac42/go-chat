@@ -7,8 +7,8 @@
 | Section | Description |
 |---------|-------------|
 | [Getting Started](getting-started/) | First-time setup and basics |
-| [Guides](guides/) | How-to guides for common tasks |
-| [Reference](reference/) | Detailed specifications |
+| [PROTOCOLS.md](../PROTOCOLS.md) | Core operating rules |
+| [Skills Manifest](../config/skills-manifest.md) | Workflow skills reference |
 
 ## Getting Started
 
@@ -18,50 +18,55 @@
 
 ## Guides
 
-- **[Working with Agents](guides/working-with-agents.md)** - How delegation works
-- **[Context Management](guides/context-management.md)** - Session handoffs and continuity
-- **[Plugin System](guides/plugin-system.md)** - Installing and using plugins
-- **[Customization](guides/customization.md)** - Adapting Garden to your workflow
-
-## Reference
-
-- **[PROTOCOLS.md](../PROTOCOLS.md)** - Core operating rules
-- **[Agents Reference](reference/agents.md)** - All 5 core agents
-- **[Skills Reference](reference/skills.md)** - Automatic behaviors
-- **[Commands Reference](reference/commands.md)** - User-invoked actions
-- **[Configuration](reference/configuration.md)** - Settings and plugins
+- **[TDD Workflow](tdd-workflow.md)** - Test-driven development guide
+- **[Context Display](context-display-guide.md)** - Token usage visualization
+- **[Vision Workflow](vision-workflow-guide.md)** - Product discovery process
+- **[GitLab CI/CD](gitlab-cicd-guide.md)** - Pipeline configuration
+- **[Strategic Agents](strategic-agents-quick-start.md)** - Using tactical/strategic agent pairs
+- **[Devcontainer Audio](devcontainer-audio-setup.md)** - Audio notifications in devcontainers
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `.garden/PROTOCOLS.md` | Core rules (read first) |
-| `.garden/PROJECT.md` | Project-specific context |
-| `.garden/QUICKSTART.md` | 2-minute setup |
-| `.garden/config/plugins.json` | Plugin configuration |
+| `.claude/PROTOCOLS.md` | Core rules (read first) |
+| `.claude/PROJECT.md` | Project-specific context |
+| `.claude/QUICKSTART.md` | 2-minute setup |
+| `.claude/config/plugins.json` | Plugin configuration |
+| `.claude/config/skills-manifest.md` | Skills workflow reference |
 
 ## Architecture
 
 ```
-.garden/
+.claude/
 ├── PROTOCOLS.md      # Core rules
 ├── PROJECT.md        # Project context
 ├── QUICKSTART.md     # Setup guide
 ├── agents/           # 5 core agents
-├── skills/           # Auto-invoked
-├── commands/         # User-invoked
+├── skills/           # Auto and user-invoked
 ├── work/
 │   ├── 0_vision/     # Strategic vision
 │   ├── 1_backlog/    # Ready for development
 │   ├── 2_active/     # In progress
 │   ├── 3_done/       # Completed
-│   └── history/      # Session logs
+│   └── history/      # Session logs (ad-hoc work)
 ├── scripts/          # CLI tools
 ├── config/           # Configuration
-├── plugins/          # Extensions
 ├── templates/        # Boilerplate
 └── docs/             # This documentation
+
+.beads/
+└── issues.jsonl      # Execution state (PRD-based work)
 ```
+
+## Session Management
+
+| Scenario | Use |
+|----------|-----|
+| PRD-based work with tasks | beads |
+| Ad-hoc work, quick fixes | handoff/catch-up |
+| Exploratory sessions | handoff/catch-up |
+| Long-running features | beads |
 
 ## Version
 

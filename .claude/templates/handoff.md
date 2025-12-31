@@ -2,29 +2,22 @@
 
 **From Session**: [Session Number]
 **Date**: [Date]
-**Branch**: [Git branch]
+**Context at Handoff**: [XX]%
 
-## Immediate Context
+## Continue With
 
-[What was being worked on when session ended]
+[Immediate next step - what to do first]
 
-## Critical Files to Read First
+## Context
 
-1. **[File path]** - [Why it's important]
-2. **[File path]** - [Why it's important]
-3. **[File path]** - [Why it's important]
+[Essential background - 2-3 sentences max]
 
-## User's Last Request
+## Key Files
 
-> [Quote or paraphrase of user's last message/intent]
+- `path/to/file` - [why it matters]
+- `path/to/file` - [why it matters]
 
-## Task in Progress
-
-**Task**: [Task name or description]
-**Status**: [Where we left off]
-**Next Step**: [Immediate next action to take]
-
-## Pending Work Items
+## Pending Work
 
 - [ ] [Item 1]
 - [ ] [Item 2]
@@ -32,39 +25,14 @@
 
 ## Key Decisions Made
 
-| Decision | Rationale | Impact |
-|----------|-----------|--------|
-| [Decision] | [Why] | [What it affects] |
+| Decision | Rationale |
+|----------|-----------|
+| [Decision] | [Why] |
 
-## Files Modified This Session
+## Notes
 
-```
-Modified:
-- [file path]: [what changed]
-- [file path]: [what changed]
-
-Created:
-- [file path]: [purpose]
-
-Deleted:
-- [file path]: [reason]
-```
-
-## Git Status
-
-```
-[Pending changes summary]
-```
-
-## Blockers or Issues
-
-- [Any blockers encountered]
-- [Issues that need resolution]
-
-## Suggested First Action
-
-[What the next session should do first to continue smoothly]
+[Any additional context for next session]
 
 ---
 
-**To continue**: Read the files listed above, then proceed with the next step indicated.
+**To continue**: Read key files, then proceed with "Continue With" section.

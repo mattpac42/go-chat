@@ -203,6 +203,56 @@ test:
       fi
 
 # ===============================================================================
+# SECURITY SCAN STAGE - Python Code & Dependency Analysis
+# ===============================================================================
+# Runs in parallel with tests to catch security issues early
+security_scan:
+  <<: *skip_if_quick
+  tags: ["docker"]
+  stage: test
+  image: python:3.12-slim
+  before_script:
+    - pip install bandit safety pip-audit detect-secrets
+    - pip install -r requirements.txt || true
+  script:
+    # Bandit - Python code security scanner
+    - echo "🔒 Running bandit security scan..."
+    - bandit -r . -f json -o bandit-report.json -x venv,__pycache__ || true
+    - bandit -r . -f screen -x venv,__pycache__
+
+    # Safety - Dependency vulnerability scanner
+    - echo "🔒 Running safety vulnerability scan..."
+    - safety check --json > safety-report.json 2>/dev/null || true
+    - safety check --full-report || true
+
+    # pip-audit - Additional dependency scanner
+    - echo "🔒 Running pip-audit..."
+    - pip-audit --format=json > pip-audit-report.json 2>/dev/null || true
+    - pip-audit || true
+
+    # detect-secrets - Credential leak detection
+    - echo "🔒 Scanning for secrets in codebase..."
+    - detect-secrets scan --all-files --force-use-all-plugins > .secrets.baseline 2>/dev/null || true
+    - |
+      if [ -s .secrets.baseline ]; then
+        SECRETS_COUNT=$(grep -c "filename" .secrets.baseline || echo "0")
+        if [ "$SECRETS_COUNT" -gt 0 ]; then
+          echo "⚠️ Potential secrets detected in $SECRETS_COUNT files"
+        else
+          echo "✅ No secrets detected"
+        fi
+      fi
+  artifacts:
+    paths:
+      - bandit-report.json
+      - safety-report.json
+      - pip-audit-report.json
+      - .secrets.baseline
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+
+# ===============================================================================
 # BUILD STAGE
 # ===============================================================================
 build_image:

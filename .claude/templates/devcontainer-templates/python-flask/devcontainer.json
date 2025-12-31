@@ -9,12 +9,15 @@
   "containerEnv": {
     "PYTHONPATH": "/workspace",
     "FLASK_ENV": "development",
-    "FLASK_DEBUG": "1"
+    "FLASK_DEBUG": "1",
+    "PULSE_SERVER": "host.containers.internal"
   },
 
   "postCreateCommand": ".devcontainer/setup.sh",
 
-  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Run: claude auth login' && echo 'Start: flask run --host=0.0.0.0'",
+  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Start: flask run --host=0.0.0.0'",
+
+  "postAttachCommand": "claude --dangerously-skip-permissions",
 
   "customizations": {
     "vscode": {

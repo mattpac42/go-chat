@@ -300,20 +300,30 @@ For projects rooted from The Garden (those with `.claude/lineage.json`), the syn
    ```bash
    diff .claude/agents/[agent].md [garden_path]/.claude/agents/[agent].md
    ```
-   Also check gnomes/agents/ for specialized agents.
+   Also check marketplace/agents/ for specialized agents.
 
 4. **Check for New Agents**
    Show agents available in Garden that weren't originally included:
    ```bash
    ls [garden_path]/.claude/agents/
-   ls [garden_path]/gnomes/agents/
+   ls [garden_path]/marketplace/agents/
    ```
 
 5. **Compare Core Files**
    - `.claude/commands/` - new or updated commands
    - `.claude/skills/` - new or updated skills
    - `.claude/templates/` - new or updated templates
+   - `.devcontainer/` - devcontainer updates (if tech_stack in lineage)
    - `CLAUDE.md` - protocol updates (merge carefully)
+
+   **For devcontainer sync:**
+   If `project.tech_stack` exists in lineage.json:
+   ```bash
+   # Compare against the template used
+   diff -r .devcontainer/ [garden_path]/.claude/templates/devcontainer-templates/[tech_stack]/
+   ```
+   Note: Project devcontainer may have customizations (GitLab certs, extra tools).
+   Recommend merging specific improvements (like postAttachCommand) rather than full replacement.
 
 6. **Apply Updates**
    For each approved update:
@@ -362,6 +372,7 @@ For projects rooted from The Garden (those with `.claude/lineage.json`), the syn
 - Commands: [list]
 - Skills: [list]
 - Templates: [list]
+- Devcontainer: [template updates if tech_stack in lineage]
 
 ## Recommended Actions
 1. [Specific steps]

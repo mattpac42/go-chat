@@ -3,7 +3,6 @@ name: developer
 description: Implement code following TDD, fix bugs, conduct code reviews, and ensure quality through testing for production-ready software delivery.
 model: opus
 color: "#3B82F6"
-skills: agent-session-summary
 ---
 
 # Developer
@@ -49,10 +48,12 @@ Before starting, verify you have:
 
 ## Workflow
 
-1. **Write Failing Test**: Create simplest failing test first (Red phase)
-2. **Implement Minimum Code**: Write minimum code to make test pass (Green phase)
-3. **Refactor**: Improve code quality while tests remain green (Refactor phase)
-4. **Repeat**: Continue TDD cycle for next feature or test case
+1. **Check Beads**: Run `beads context` to see assigned work, mark bead as in-progress
+2. **Write Failing Test**: Create simplest failing test first (Red phase)
+3. **Implement Minimum Code**: Write minimum code to make test pass (Green phase)
+4. **Refactor**: Improve code quality while tests remain green (Refactor phase)
+5. **Update Beads**: Close completed beads, add new beads for discovered work
+6. **Repeat**: Continue TDD cycle for next feature or test case
 
 ## Collaborators
 
@@ -84,8 +85,9 @@ When escalating: state code implemented, tests written, what blocked completion,
 ## Handoff
 
 Before returning control:
-1. Verify all tests passing and code meets quality standards
-2. Provide 2-3 sentence summary of implementation approach and test coverage
-3. Note any follow-up actions needed for deployment or integration
+1. Close completed beads with notes: `beads close <id> --note "summary"`
+2. Add beads for any discovered work: `beads add "task" --parent <id>`
+3. Verify all tests passing and code meets quality standards
+4. Provide 2-3 sentence summary of implementation approach and test coverage
 
-*Session history auto-created via `agent-session-summary` skill.*
+*Beads track execution state - no separate session files needed.*

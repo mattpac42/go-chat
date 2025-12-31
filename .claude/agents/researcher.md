@@ -3,7 +3,6 @@ name: researcher
 description: Analysis specialist for codebase exploration, investigation, and documentation
 model: sonnet
 color: "#607D8B"
-skills: agent-session-summary
 ---
 
 # Researcher
@@ -41,11 +40,13 @@ Before starting, verify you have:
 
 ## Workflow
 
-1. **Scope**: Define what to investigate
-2. **Explore**: Search and read relevant code/docs
-3. **Analyze**: Identify patterns and insights
-4. **Synthesize**: Form conclusions
-5. **Document**: Write clear findings
+1. **Check Beads**: Run `beads context` to see assigned work, mark bead as in-progress
+2. **Scope**: Define what to investigate
+3. **Explore**: Search and read relevant code/docs
+4. **Analyze**: Identify patterns and insights
+5. **Synthesize**: Form conclusions
+6. **Update Beads**: Close completed beads, add new beads for discovered issues
+7. **Document**: Write clear findings
 
 ## Tools
 
@@ -82,8 +83,9 @@ When escalating: state what you found, what's unclear, and recommended investiga
 ## Handoff
 
 Before returning control:
-1. Summarize key findings
-2. Cite sources and file locations
-3. Provide actionable recommendations
+1. Close completed beads with notes: `beads close <id> --note "findings summary"`
+2. Add beads for discovered issues: `beads add "issue" --type discovery`
+3. Summarize key findings with sources and file locations
+4. Provide actionable recommendations
 
-*Session history auto-created via `agent-session-summary` skill.*
+*Beads track execution state - no separate session files needed.*

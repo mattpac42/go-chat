@@ -11,7 +11,7 @@ Verify Garden setup is complete and valid.
 
 ### Required Structure
 ```
-.garden/
+.claude/
 ├── PROTOCOLS.md
 ├── PROJECT.md
 ├── agents/ (5 core agents)
@@ -49,7 +49,7 @@ Structure: ❌
   • Missing: work/active/
 
 Status: ISSUES FOUND
-Fix: mkdir -p .garden/work/active
+Fix: mkdir -p .claude/work/active
 ```
 
 ## Remediation

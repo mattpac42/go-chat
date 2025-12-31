@@ -12,14 +12,14 @@
       "installed_at": "2025-12-21",
       "components": {
         "agents": ["developer", "architect", "product", "platform", "researcher"],
-        "skills": ["catch-up", "agent-session-summary", "context-display", "setup-validation"],
-        "commands": ["handoff", "commit", "mr"]
+        "skills": ["beads", "context-display", "setup-validation", "task-generate", "prd-create"],
+        "commands": ["commit", "mr"]
       }
     }
   },
 
   "agent_library": {
-    "path": "gnomes/agents/",
+    "path": "marketplace/agents/",
     "description": "130+ specialized agents available for use"
   },
 

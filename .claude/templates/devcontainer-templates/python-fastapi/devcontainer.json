@@ -7,12 +7,15 @@
   ],
 
   "containerEnv": {
-    "PYTHONPATH": "/workspace"
+    "PYTHONPATH": "/workspace",
+    "PULSE_SERVER": "host.containers.internal"
   },
 
   "postCreateCommand": ".devcontainer/setup.sh",
 
-  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Run: claude auth login' && echo 'Start: uvicorn main:app --reload --host 0.0.0.0'",
+  "postStartCommand": "echo '{{PROJECT_NAME}} Dev Environment Ready!' && echo 'Start: uvicorn main:app --reload --host 0.0.0.0'",
+
+  "postAttachCommand": "claude --dangerously-skip-permissions",
 
   "customizations": {
     "vscode": {

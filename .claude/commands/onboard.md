@@ -111,10 +111,10 @@
       - Playful: "Lettuce celebrate!", "That was un-be-leaf-able work."
       - Professional with twist: "The garden has been tended.", "All weeds have been pulled."
 
-      **For "the_gnomes" example:**
+      **For "the_marketplace" example:**
       - Gnome puns: "Gnome more work for now!", "There's gnome place like home."
-      - Playful: "The gnomes have clocked out.", "Gnomebody does it better."
-      - Fantasy: "Magic complete!", "The gnomes grant you a break."
+      - Playful: "The marketplace have clocked out.", "Gnomebody does it better."
+      - Fantasy: "Magic complete!", "The marketplace grant you a break."
 
       **Style Categories to Include:**
       - Direct project references (20-25): Simple statements using project name
@@ -335,15 +335,15 @@
 
 11. **Agent Selection (Hiring Your Team)**
 
-   Based on PRODUCT_VISION.md and PROJECT_CONTEXT.md, recommend and copy specialized agents from the gnomes library.
+   Based on PRODUCT_VISION.md and PROJECT_CONTEXT.md, recommend and copy specialized agents from the marketplace library.
 
    1. **Locate Agent Library**
-      - Check for the gnomes agent library at: `../the_gnomes/agents/` (relative to current project)
-      - If not found, try: `~/git/the_garden/the_gnomes/agents/`
+      - Check for the marketplace agent library at: `../the_marketplace/agents/` (relative to current project)
+      - If not found, try: `~/git/the_garden/the_marketplace/agents/`
       - If still not found, skip agent hiring with message:
         ```
         ⚠️  Agent library not found. Skipping agent hiring.
-        You can manually copy agents from the_gnomes/agents/ later.
+        You can manually copy agents from the_marketplace/agents/ later.
         ```
 
    2. **Discover Available Agents**
@@ -477,7 +477,7 @@
       ```
       ⏭️  Skipping agent hiring.
 
-      You can hire agents later by copying them from the_gnomes/agents/
+      You can hire agents later by copying them from the_marketplace/agents/
       to your project's .claude/agents/ directory.
 
       🎉 Onboarding complete! Your workspace is ready.

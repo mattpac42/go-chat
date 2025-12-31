@@ -13,7 +13,7 @@ Configure Claude Code hooks for automated workflow enhancements.
 - Runs at the start of each user message
 - Shows context usage with emoji visualization
 - Triggers automatic handoff at 75% threshold
-- Uses `.garden/scripts/context-tracker.py --show-ab`
+- Uses `.claude/scripts/context-tracker.py --show-ab`
 
 **Hook 2: Stop** (Completion Notification)
 - Runs when Claude finishes a response
@@ -24,14 +24,14 @@ Configure Claude Code hooks for automated workflow enhancements.
   📊 Session complete | Context: XX% | Agents: X invocations
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ```
-- Uses `.garden/scripts/completion-status.sh`
+- Uses `.claude/scripts/completion-status.sh`
 
 ## Prerequisites
 
 - macOS (for `say` command and audio output)
 - `jq` installed (for JSON parsing in completion script)
-- `.garden/scripts/context-tracker.py` exists (Garden 2.0 standard)
-- `.garden/scripts/completion-status.sh` created by this skill
+- `.claude/scripts/context-tracker.py` exists (Garden 2.0 standard)
+- `.claude/scripts/completion-status.sh` created by this skill
 
 ## Configuration Steps
 
@@ -49,7 +49,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "./.garden/scripts/context-tracker.py --show-ab"
+            "command": "./.claude/scripts/context-tracker.py --show-ab"
           }
         ]
       }
@@ -60,7 +60,7 @@ Add this to `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "./.garden/scripts/completion-status.sh"
+            "command": "./.claude/scripts/completion-status.sh"
           }
         ]
       }
@@ -79,14 +79,14 @@ Add this to `.claude/settings.json`:
 If `.claude/settings.json` already exists with different hooks:
 
 **For UserPromptSubmit:**
-- Replace the command path to use `.garden/scripts/context-tracker.py --show-ab`
+- Replace the command path to use `.claude/scripts/context-tracker.py --show-ab`
 - Example old path: `./.claude/hooks/post-prompt-context.sh`
-- Example new path: `./.garden/scripts/context-tracker.py --show-ab`
+- Example new path: `./.claude/scripts/context-tracker.py --show-ab`
 
 **For Stop:**
-- Replace the command path to use `.garden/scripts/completion-status.sh`
+- Replace the command path to use `.claude/scripts/completion-status.sh`
 - Example old path: `./.claude/hooks/completion-one-liners.sh`
-- Example new path: `./.garden/scripts/completion-status.sh`
+- Example new path: `./.claude/scripts/completion-status.sh`
 
 **Permissions:**
 - Ensure `"Bash(say:*)"` is in the `permissions.allow` array
@@ -131,7 +131,7 @@ If `.claude/settings.json` already exists with different hooks:
       "hooks": [
         {
           "type": "command",
-          "command": "./.garden/scripts/context-tracker.py --show-ab"
+          "command": "./.claude/scripts/context-tracker.py --show-ab"
         }
       ]
     }
@@ -142,7 +142,7 @@ If `.claude/settings.json` already exists with different hooks:
       "hooks": [
         {
           "type": "command",
-          "command": "./.garden/scripts/completion-status.sh"
+          "command": "./.claude/scripts/completion-status.sh"
         }
       ]
     }
@@ -168,23 +168,23 @@ If `.claude/settings.json` already exists with different hooks:
 **Manual Test Scripts:**
 ```bash
 # Test context tracker directly
-./.garden/scripts/context-tracker.py --show-ab
+./.claude/scripts/context-tracker.py --show-ab
 
 # Test completion status directly
-./.garden/scripts/completion-status.sh
+./.claude/scripts/completion-status.sh
 ```
 
 ## Customization
 
 **Disable Audio:**
-- Comment out the `say` line in `.garden/scripts/completion-status.sh`
+- Comment out the `say` line in `.claude/scripts/completion-status.sh`
 
 **Change Voice/Message:**
-- Edit the `say` command in `.garden/scripts/completion-status.sh`
+- Edit the `say` command in `.claude/scripts/completion-status.sh`
 - Example: `say -v "Samantha" "Work complete"`
 
 **Adjust Status Display:**
-- Modify the echo statements in `.garden/scripts/completion-status.sh`
+- Modify the echo statements in `.claude/scripts/completion-status.sh`
 - Use different emojis or formatting
 
 ## Troubleshooting
@@ -201,7 +201,7 @@ If `.claude/settings.json` already exists with different hooks:
 **Hooks not running:**
 - Check `.claude/settings.json` syntax (valid JSON)
 - Verify script paths are correct (relative to repo root)
-- Ensure scripts are executable: `chmod +x .garden/scripts/*.sh`
+- Ensure scripts are executable: `chmod +x .claude/scripts/*.sh`
 
 **Permissions denied:**
 - Add `"Bash(say:*)"` to `permissions.allow` array
@@ -209,12 +209,12 @@ If `.claude/settings.json` already exists with different hooks:
 
 ## Files Created
 
-- `.garden/scripts/completion-status.sh` - Completion notification script
-- `.garden/.context-state.json` - Context state (auto-created by tracker)
-- `.garden/.context-ab-test.jsonl` - A/B test logs (auto-created by tracker)
+- `.claude/scripts/completion-status.sh` - Completion notification script
+- `.claude/.context-state.json` - Context state (auto-created by tracker)
+- `.claude/.context-ab-test.jsonl` - A/B test logs (auto-created by tracker)
 
 ## Related
 
-- **Context Display Skill**: See `.garden/skills/context-display/SKILL.md`
-- **Context Tracker**: See `.garden/scripts/context-tracker.py`
-- **Handoff Protocol**: See `.garden/PROTOCOLS.md` (Session Management)
+- **Context Display Skill**: See `.claude/skills/context-display/SKILL.md`
+- **Context Tracker**: See `.claude/scripts/context-tracker.py`
+- **Handoff Protocol**: See `.claude/PROTOCOLS.md` (Session Management)

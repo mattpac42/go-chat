@@ -1,0 +1,24 @@
+# Claude Agent System Runtime Files
+.claude/.context-state.json
+.claude/.context-ab-test.jsonl
+.claude/settings.local.json
+
+# OS Files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+
+# Build
+dist/
+build/
+*.pyc
