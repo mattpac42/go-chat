@@ -235,4 +235,12 @@ describe('WageSettingsModal', () => {
       expect(screen.getByLabelText('Designer/UX')).toHaveAttribute('step', '0.01');
     });
   });
+
+  describe('version display', () => {
+    it('displays version information in the modal footer', () => {
+      render(<WageSettingsModal isOpen={true} onClose={mockOnClose} />);
+
+      expect(screen.getByTestId('version-display')).toBeInTheDocument();
+    });
+  });
 });

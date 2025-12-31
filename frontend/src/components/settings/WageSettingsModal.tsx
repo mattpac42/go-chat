@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useWageSettings, DEFAULT_WAGE_SETTINGS, type WageSettings } from '@/hooks/useWageSettings';
+import { VersionDisplay } from './VersionDisplay';
 
 interface WageSettingsModalProps {
   isOpen: boolean;
@@ -171,26 +172,31 @@ export function WageSettingsModal({ isOpen, onClose }: WageSettingsModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
-          <button
-            onClick={handleReset}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            Reset to Defaults
-          </button>
-          <div className="flex gap-3">
+        <div className="flex flex-col gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex items-center justify-between">
             <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={handleReset}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              Cancel
+              Reset to Defaults
             </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
-            >
-              Save
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+          <div className="text-center">
+            <VersionDisplay />
           </div>
         </div>
       </div>
