@@ -345,7 +345,7 @@ export function PreviewModal({ files, isOpen, onClose }: PreviewModalProps) {
             <iframe
               key={refreshKey}
               srcDoc={previewHtml}
-              sandbox="allow-scripts"
+              sandbox="allow-scripts allow-same-origin"
               className={`w-full bg-white border-0 ${
                 !isFullWidth
                   ? 'rounded-b-lg'

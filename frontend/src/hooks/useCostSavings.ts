@@ -21,7 +21,9 @@ export interface SessionMetrics {
   messageCount: number;
   filesGenerated: number;
   tokensUsed?: number; // If available, use actual tokens; otherwise estimate
-  designerMessageCount?: number; // Count of messages from designer agent
+  designerMessageCount?: number; // Count of messages from designer agent (Bloom)
+  pmMessageCount?: number; // Count of messages from product_manager agent (Root)
+  developerMessageCount?: number; // Count of messages from developer agent (Harvest)
 }
 
 /**
@@ -38,20 +40,26 @@ export interface CostSavingsResult {
 }
 
 /**
- * Estimate PM minutes based on message count
- * Assumes each message exchange represents about 1.5 minutes of PM thinking/planning
+ * Estimate PM minutes based on PM message count
+ * Assumes each PM message represents about 1.5 minutes of PM thinking/planning
+ * Falls back to total messageCount for backward compatibility
  */
-function estimatePmMinutes(messageCount: number): number {
-  return messageCount * PM_MINUTES_PER_MESSAGE;
+function estimatePmMinutes(pmMessageCount: number | undefined, messageCount: number): number {
+  // Use pmMessageCount if available, otherwise fall back to total messageCount
+  const count = pmMessageCount ?? messageCount;
+  return count * PM_MINUTES_PER_MESSAGE;
 }
 
 /**
- * Estimate dev hours based on files generated and message complexity
- * Each file represents significant dev work, messages add incremental time
+ * Estimate dev hours based on files generated and developer message count
+ * Each file represents significant dev work, developer messages add incremental time
+ * Falls back to total messageCount for backward compatibility
  */
-function estimateDevHours(filesGenerated: number, messageCount: number): number {
+function estimateDevHours(filesGenerated: number, developerMessageCount: number | undefined, messageCount: number): number {
   const fileBasedHours = filesGenerated * DEV_HOURS_PER_FILE;
-  const messageBasedHours = (messageCount / 100) * DEV_HOURS_PER_100_MESSAGES;
+  // Use developerMessageCount if available, otherwise fall back to total messageCount
+  const devMsgCount = developerMessageCount ?? messageCount;
+  const messageBasedHours = (devMsgCount / 100) * DEV_HOURS_PER_100_MESSAGES;
   return fileBasedHours + messageBasedHours;
 }
 
@@ -129,12 +137,22 @@ export function useCostSavings(metrics: SessionMetrics): CostSavingsResult {
   const { settings } = useWageSettings();
 
   return useMemo(() => {
-    const { messageCount, filesGenerated, tokensUsed, designerMessageCount = 0 } = metrics;
+    const {
+      messageCount,
+      filesGenerated,
+      tokensUsed,
+      designerMessageCount = 0,
+      pmMessageCount,
+      developerMessageCount,
+    } = metrics;
     const { pmHourlyRate, devHourlyRate, designerHourlyRate } = settings;
 
     // Estimate or use provided values
-    const pmMinutes = estimatePmMinutes(messageCount);
-    const devHours = estimateDevHours(filesGenerated, messageCount);
+    // PM minutes from pmMessageCount (falls back to messageCount for backward compatibility)
+    const pmMinutes = estimatePmMinutes(pmMessageCount, messageCount);
+    // Dev hours from developerMessageCount + filesGenerated (falls back to messageCount)
+    const devHours = estimateDevHours(filesGenerated, developerMessageCount, messageCount);
+    // Designer hours from designerMessageCount (already correct)
     const designerHours = estimateDesignerHours(designerMessageCount);
     const tokens = tokensUsed ?? estimateTokens(messageCount);
 

@@ -209,27 +209,29 @@ export function BuildPhaseProgress({
             <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5">
               <button
                 onClick={() => showPhasedView && onTogglePhasedView()}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center justify-center p-2 rounded-md transition-all ${
                   !showPhasedView
                     ? 'bg-teal-500 text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 aria-pressed={!showPhasedView}
+                aria-label="Timeline view"
+                title="Timeline view"
               >
-                <ListIcon className="w-4 h-4" />
-                <span className="hidden xl:inline">Timeline</span>
+                <ClockIcon className="w-4 h-4" />
               </button>
               <button
                 onClick={() => !showPhasedView && onTogglePhasedView()}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center justify-center p-2 rounded-md transition-all ${
                   showPhasedView
                     ? 'bg-teal-500 text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 aria-pressed={showPhasedView}
+                aria-label="Group by phase"
+                title="Group by phase"
               >
-                <GridIcon className="w-4 h-4" />
-                <span className="hidden xl:inline">By Phase</span>
+                <LayersIcon className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -460,7 +462,7 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-function ListIcon({ className }: { className?: string }) {
+function ClockIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -472,13 +474,13 @@ function ListIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M4 6h16M4 12h16M4 18h16"
+        d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
       />
     </svg>
   );
 }
 
-function GridIcon({ className }: { className?: string }) {
+function LayersIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -490,7 +492,7 @@ function GridIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
       />
     </svg>
   );

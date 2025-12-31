@@ -107,12 +107,16 @@ function buildPreviewHtml(files: PreviewFile[]): string {
 /**
  * ProjectPreview - Renders project files in a sandboxed iframe
  *
- * Security: Uses sandbox="allow-scripts" to allow JS execution
- * while preventing:
- * - Form submissions
- * - Same-origin access
- * - Popups
+ * Security: Uses sandbox with limited permissions:
+ * - allow-scripts: Execute JavaScript
+ * - allow-same-origin: Access localStorage/sessionStorage (required for stateful apps)
+ *
+ * Still prevents:
+ * - Form submissions to external servers
+ * - Popups and new windows
  * - Top navigation
+ * - Pointer lock
+ * - Presentation API
  */
 export function ProjectPreview({ files, className = '' }: ProjectPreviewProps) {
   const previewHtml = useMemo(() => buildPreviewHtml(files), [files]);
@@ -120,7 +124,7 @@ export function ProjectPreview({ files, className = '' }: ProjectPreviewProps) {
   return (
     <iframe
       srcDoc={previewHtml}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-same-origin"
       className={`w-full h-full border-0 bg-white ${className}`}
       title="App Preview"
     />

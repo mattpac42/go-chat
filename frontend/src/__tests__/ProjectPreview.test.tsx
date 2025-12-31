@@ -9,7 +9,7 @@ describe('ProjectPreview', () => {
 
       const iframe = screen.getByTitle('App Preview');
       expect(iframe).toBeInTheDocument();
-      expect(iframe).toHaveAttribute('sandbox', 'allow-scripts');
+      expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
     });
   });
 
@@ -119,7 +119,7 @@ describe('ProjectPreview', () => {
   });
 
   describe('security', () => {
-    it('applies sandbox attribute with allow-scripts only', () => {
+    it('applies sandbox attribute with allow-scripts and allow-same-origin', () => {
       const files = [
         { path: 'index.html', content: '<html><body>Test</body></html>' },
       ];
@@ -127,9 +127,8 @@ describe('ProjectPreview', () => {
       render(<ProjectPreview files={files} />);
 
       const iframe = screen.getByTitle('App Preview');
-      expect(iframe).toHaveAttribute('sandbox', 'allow-scripts');
-      // Verify no other permissions are granted
-      expect(iframe.getAttribute('sandbox')).toBe('allow-scripts');
+      // allow-same-origin is needed for localStorage access in previewed apps
+      expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin');
     });
   });
 

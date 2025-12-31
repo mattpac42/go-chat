@@ -323,7 +323,9 @@ export function ChatContainer({
                 metrics={{
                   messageCount: messages.length,
                   filesGenerated: 0,
+                  pmMessageCount: messages.filter(m => m.role === 'assistant' && (m.agentType === 'product_manager' || m.agentType === 'product')).length,
                   designerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'designer').length,
+                  developerMessageCount: messages.filter(m => m.role === 'assistant' && m.agentType === 'developer').length,
                 }}
                 storageKey={`cost-savings-${projectId}`}
               />
