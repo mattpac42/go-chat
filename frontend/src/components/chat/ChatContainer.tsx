@@ -270,9 +270,9 @@ export function ChatContainer({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white overflow-visible">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 pt-7 border-b border-gray-200 bg-white sticky top-0 z-10 safe-area-pt overflow-visible">
+      <header className="flex items-center justify-between px-4 py-3 pt-8 border-b border-gray-200 bg-white sticky top-0 z-10 safe-area-pt overflow-visible">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {onMenuClick && (
             <button

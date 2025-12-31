@@ -36,6 +36,15 @@ describe('MessageBubble', () => {
     isStreaming: true,
   };
 
+  const messageWithDiscoveryData: Message = {
+    id: 'test-discovery-1',
+    projectId: 'project-1',
+    role: 'assistant',
+    content: 'Welcome to your project!<!--DISCOVERY_DATA:{"stage_complete":true,"extracted":{"business_context":"test"}}-->',
+    timestamp: '2025-12-24T10:04:00Z',
+    isStreaming: true,
+  };
+
   it('renders user message with correct styling', () => {
     render(<MessageBubble message={userMessage} />);
 
@@ -90,5 +99,17 @@ describe('MessageBubble', () => {
 
     const copyButton = screen.getByRole('button', { name: /copy/i });
     expect(copyButton).toBeInTheDocument();
+  });
+
+  it('strips DISCOVERY_DATA metadata from streaming messages', () => {
+    render(<MessageBubble message={messageWithDiscoveryData} />);
+
+    // Should display the user-facing content (using regex for partial match)
+    expect(screen.getByText(/Welcome to your project/)).toBeInTheDocument();
+
+    // Should NOT display the metadata comment
+    expect(screen.queryByText(/DISCOVERY_DATA/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stage_complete/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/business_context/)).not.toBeInTheDocument();
   });
 });

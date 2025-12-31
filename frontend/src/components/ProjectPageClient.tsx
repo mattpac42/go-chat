@@ -251,7 +251,7 @@ export function ProjectPageClient() {
       )}
 
       {/* Main chat area */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 overflow-visible">
         {isLoadingProject ? (
           <div className="flex-1 flex items-center justify-center">
             <LoadingSpinner size="lg" />

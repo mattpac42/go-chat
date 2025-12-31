@@ -20,6 +20,17 @@ function preprocessMarkdown(content: string): string {
 }
 
 /**
+ * Strip DISCOVERY_DATA metadata comments from content
+ * These are backend-to-backend metadata that should never be shown to users
+ */
+function stripDiscoveryMetadata(content: string): string {
+  // Remove the discovery data HTML comment completely
+  // Pattern: <!--DISCOVERY_DATA:{...}--> where {...} is JSON (may contain nested braces)
+  // Use a non-greedy match that ends at the --> delimiter
+  return content.replace(/<!--DISCOVERY_DATA:.*?-->/g, '');
+}
+
+/**
  * Convert inline lists to proper markdown block lists
  * Handles patterns like:
  * - "1. Item 2. Item 3. Item" -> proper numbered list
@@ -116,10 +127,13 @@ function convertInlineLists(content: string): string {
  * Also removes code blocks from display since files are shown in the Files panel
  */
 function processAssistantContent(content: string, showCode: boolean): string {
+  // First, strip any discovery metadata - this should NEVER be shown to users
+  let cleanContent = stripDiscoveryMetadata(content);
+
   // Extract filenames from code blocks with our metadata format
   // Pattern: ```lang:filename followed by --- and short_description
   const filenamePattern = /```(\w+):([^\n]+)\n---[\s\S]*?short_description:/g;
-  const filenameMatches = Array.from(content.matchAll(filenamePattern));
+  const filenameMatches = Array.from(cleanContent.matchAll(filenamePattern));
   const filenames = filenameMatches.map(m => m[2].trim());
 
   // Remove duplicates
@@ -129,8 +143,6 @@ function processAssistantContent(content: string, showCode: boolean): string {
   // Strategy: Find the FIRST code block with metadata and remove everything from there to the end
   // This is simpler and more reliable than trying to find matching closing fences
   // (which is hard when the content contains nested code blocks)
-  let cleanContent = content;
-
   if (uniqueFilenames.length > 0) {
     // Find the first occurrence of a code block with our metadata format
     const metadataBlockStart = /```\w+:[^\n]+\n---[\s\S]*?short_description:/;
@@ -150,7 +162,7 @@ function processAssistantContent(content: string, showCode: boolean): string {
   }
 
   // Apply inline list conversion to fix Claude's tendency to output inline lists
-  cleanContent = convertInlineLists(cleanContent || content);
+  cleanContent = convertInlineLists(cleanContent);
 
   // If showCode is true, return whatever content we have
   if (showCode) {

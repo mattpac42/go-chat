@@ -286,7 +286,7 @@ export function ChatInput({
 
   return (
     <div
-      className={`flex flex-col gap-2 p-4 pb-8 border-t border-gray-200 bg-white safe-area-pb transition-colors ${
+      className={`flex flex-col gap-2 p-4 pb-10 border-t border-gray-200 bg-gray-50 safe-area-pb transition-colors ${
         isDragOver ? 'bg-teal-50 border-t-teal-400' : ''
       }`}
       onDragOver={handleDragOver}
