@@ -1,77 +1,53 @@
-# Handoff - Session 016
+# Handoff - Session 017
 
 ## Immediate Context
 
-Implemented 6 features in parallel using developer agents:
-1. Cost savings icon with popover and animation
-2. Sandbox iframe preview for HTML/CSS/JS
-3. Phase progress indicators (bar, sections, toasts)
-4. Persona introductions (Root introduces team)
-5. Fixed undefined users bug
-6. Fixed persona colors not showing until refresh
+Completed demo fixes branch with 6 commits focused on UX polish. All 210 tests pass.
 
 ## Branch
 
-`main` - All changes committed (2bb2d2b)
+`demo-fixes` - 6 commits ahead of main
 
 ## Last Commit
 
 ```
-feat: add phase progress, persona intros, preview, and bug fixes
+646a144 fix: add top/bottom padding to root layout for badge and input spacing
 ```
-
-36 files changed, +3033/-131 lines
 
 ## Working Tree
 
-Clean - no uncommitted changes
+Clean - one modified file (FEATURES.md) not staged, plus session history files.
 
 ## Critical Files to Read
 
-1. `frontend/src/components/chat/ChatContainer.tsx` - Main integration point
-2. `frontend/src/components/chat/BuildPhaseProgress.tsx` - Phase detection logic
-3. `frontend/src/components/preview/ProjectPreview.tsx` - Sandbox iframe
-4. `frontend/src/hooks/usePersonaIntroductions.ts` - Intro injection logic
+1. `frontend/src/components/chat/BuildPhaseProgress.tsx` - Phase categorization with Root markers
+2. `frontend/src/hooks/useWageSettings.ts` - Configurable wage rates
+3. `frontend/src/components/preview/PreviewModal.tsx` - Fullscreen preview modal
+4. `frontend/src/app/layout.tsx` - Root padding for spacing
 
-## Known Issues
+## Key Features Added This Session
 
-1. **Pre-existing**: `ProjectCard.test.tsx` has 14 failing tests (aria-label changes from previous sessions)
-2. **Pre-existing**: Next.js error page build warnings (Html import issue)
-3. Phase detection uses content heuristics - may need refinement
+| Feature | Status |
+|---------|--------|
+| Phase categorization (Root markers, sticky phases) | Complete |
+| Wage settings modal (PM/Dev/Designer rates) | Complete |
+| Fullscreen preview with device frames | Complete |
+| Icon-only toggle (Clock/Layers) | Complete |
+| Cost per-agent tracking | Complete |
+| UI spacing fixes | Complete |
+
+## Pending Items
+
+1. **Project metadata extraction** - Some new projects not getting title/summary. Investigate backend logs or Claude prompt consistency.
+2. **Merge to main** - Branch ready for merge when user approves
 
 ## Suggested First Actions
 
-1. **Manual testing**: Test all 6 new features in browser
-2. **Push to remotes**: `git push origin main && git push gitlab main`
-3. **Fix ProjectCard tests**: Update aria-labels in tests to match current UI
-
-## Feature Details
-
-### Cost Savings Icon
-- Location: Header, before "Project Summary" button
-- Shows badge with total savings ($42, $1.2k format)
-- Pulse animation when savings increased since last view
-- Click opens popover with full CostSavingsCard
-
-### Preview Iframe
-- Location: Right sidebar, Files/Preview tabs
-- Sandboxed with `allow-scripts` only
-- Combines HTML + injects CSS/JS automatically
-- Shows empty state when no HTML file
-
-### Phase Indicators
-- Phases: Discovery → Planning → Building → Testing → Launch
-- Toggle button to switch timeline/grouped view
-- MilestoneToast auto-dismisses after 4s
-
-### Persona Introductions
-- Triggers when discovery completes and first non-Root message appears
-- Root introduces Bloom and Harvest
-- Each persona gives brief self-intro
-- Persisted to localStorage per project
+1. Test the demo-fixes branch in browser
+2. If satisfied, merge to main: `git checkout main && git merge demo-fixes`
+3. Push to remotes: `git push origin main && git push gitlab main`
 
 ## Session History
 
-- SESSION-014: Image upload, clipboard paste
-- SESSION-015: Fixed paste bug, file attachment, drag-drop, inline title
-- SESSION-016: 6 parallel features (this session)
+- SESSION-016: Phase progress, persona intros, preview, bug fixes
+- SESSION-017: Demo fixes branch - phase categorization, wage settings, preview modal (this session)

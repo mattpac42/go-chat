@@ -1,9 +1,20 @@
+- who am I? agent profiles, like you have in Slack, be able to change how they act or what they focus on
 - auto compacting the messages, when you are creating something, so all messages for a particular task are summarized and then grouped together to show you what you did for those 50 messages, like zooming out on a high level project, or something like that
 - once the chat gets too long, can we summarize the chat up above rather than having all the text in some way? I'd like to make sure that we don't use a ton of context at some point, so we can summarize and list out bullet points or something like that so someone doesn't need to read all the chat if they don't want to but can look at the high level of what's been done. Does that make sense? What does the team recommend or what options do they have for something like this?
 - if I refresh the page while it's generating a response I want to make sure I still get the message
 - add a microphone button to each of the messages to play it with the system audio
 
-
+- different personalities for the personas
+- can i hire certain personalities?
+- audio of what was said so i can talk back and forth"
+- if they arent progressing, give them ideas
+- lay out a roadmap for their journey that the agents should be following thats declarative
+- need options on how to deploy and how to database
+- how do the agents interact with each other like in a group text/channel/dm? are they periodically checking in? do they jave their own context window we store for them?
+- badges, icons, profile
+- landing page and SSO/auth
+- notifications when a chat is done or ready for my response, like a text message would come in from the chat just like youd get from your team
+- 
 
 Suggestions
 - with cost savings, let's have a special icon next to "Project Summary" like a money bag or dollar sign that you can click on to show the savings report instead of having it at the bottom of the Project Summary
