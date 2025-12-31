@@ -125,6 +125,35 @@ export function detectCurrentPhase(messages: Message[]): BuildPhase {
 }
 
 /**
+ * Detect phase with context - for user messages that default to 'discovery',
+ * inherit the phase from the following assistant message if available.
+ */
+export function detectPhaseWithContext(
+  messages: Message[],
+  index: number
+): BuildPhase {
+  const message = messages[index];
+  const detectedPhase = detectPhaseFromMessage(message);
+
+  // If not a user message or if it matched a specific phase, use as-is
+  if (message.role !== 'user' || detectedPhase !== 'discovery') {
+    return detectedPhase;
+  }
+
+  // For user messages that defaulted to 'discovery', look ahead
+  // to find the next assistant message and inherit its phase
+  for (let i = index + 1; i < messages.length; i++) {
+    if (messages[i].role === 'assistant') {
+      const assistantPhase = detectPhaseFromMessage(messages[i]);
+      return assistantPhase;
+    }
+  }
+
+  // No following assistant message found, keep as discovery
+  return 'discovery';
+}
+
+/**
  * Group messages by their detected phase
  */
 export function groupMessagesByPhase(messages: Message[]): Map<BuildPhase, Message[]> {
@@ -133,8 +162,8 @@ export function groupMessagesByPhase(messages: Message[]): Map<BuildPhase, Messa
   // Initialize all phases with empty arrays
   PHASES.forEach((p) => groups.set(p.phase, []));
 
-  messages.forEach((message) => {
-    const phase = detectPhaseFromMessage(message);
+  messages.forEach((message, index) => {
+    const phase = detectPhaseWithContext(messages, index);
     const existing = groups.get(phase) || [];
     existing.push(message);
     groups.set(phase, existing);
@@ -175,26 +204,34 @@ export function BuildPhaseProgress({
       <div className="max-w-4xl mx-auto">
         {/* Desktop view */}
         <div className="hidden md:flex items-center gap-4">
-          {/* View toggle button */}
+          {/* View segmented control */}
           {onTogglePhasedView && (
-            <button
-              onClick={onTogglePhasedView}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                showPhasedView
-                  ? 'bg-teal-100 text-teal-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              title={showPhasedView ? 'Show timeline view' : 'Show grouped view'}
-            >
-              {showPhasedView ? (
+            <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+              <button
+                onClick={() => showPhasedView && onTogglePhasedView()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  !showPhasedView
+                    ? 'bg-teal-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+                aria-pressed={!showPhasedView}
+              >
                 <ListIcon className="w-4 h-4" />
-              ) : (
+                <span className="hidden xl:inline">Timeline</span>
+              </button>
+              <button
+                onClick={() => !showPhasedView && onTogglePhasedView()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  showPhasedView
+                    ? 'bg-teal-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+                aria-pressed={showPhasedView}
+              >
                 <GridIcon className="w-4 h-4" />
-              )}
-              <span className="hidden xl:inline">
-                {showPhasedView ? 'Timeline' : 'Group'}
-              </span>
-            </button>
+                <span className="hidden xl:inline">By Phase</span>
+              </button>
+            </div>
           )}
 
           {/* Phase indicators */}

@@ -1,9 +1,12 @@
 'use client';
 
+import { useWageSettings } from '@/hooks/useWageSettings';
+
 // Types for Cost Savings data
 export interface CostSavingsData {
   pmMinutes: number;        // Minutes of PM-equivalent work
   devHours: number;         // Hours of dev-equivalent work
+  designerHours: number;    // Hours of designer-equivalent work
   messageCount: number;     // Total messages in session
   filesGenerated: number;   // Files created
   tokensUsed: number;       // Approximate tokens (for AI cost calc)
@@ -14,10 +17,6 @@ export interface CostSavingsCardProps {
   showDetailed?: boolean;   // Show breakdown or just totals
 }
 
-// Rate constants (midpoint values)
-const PM_HOURLY_RATE = 80;        // $80/hr for PM consulting
-const DEV_HOURLY_RATE = 112.50;   // $112.50/hr for development
-
 // AI cost per 1K tokens
 const INPUT_COST_PER_1K = 0.003;  // $0.003 per 1K input tokens
 const OUTPUT_COST_PER_1K = 0.015; // $0.015 per 1K output tokens
@@ -26,15 +25,22 @@ const INPUT_OUTPUT_RATIO = 0.6;   // 60% input, 40% output estimate
 /**
  * Calculate PM consulting value based on minutes spent
  */
-function calculatePmValue(minutes: number): number {
-  return (minutes / 60) * PM_HOURLY_RATE;
+function calculatePmValue(minutes: number, hourlyRate: number): number {
+  return (minutes / 60) * hourlyRate;
 }
 
 /**
  * Calculate development value based on hours spent
  */
-function calculateDevValue(hours: number): number {
-  return hours * DEV_HOURLY_RATE;
+function calculateDevValue(hours: number, hourlyRate: number): number {
+  return hours * hourlyRate;
+}
+
+/**
+ * Calculate designer value based on hours spent
+ */
+function calculateDesignerValue(hours: number, hourlyRate: number): number {
+  return hours * hourlyRate;
 }
 
 /**
@@ -83,8 +89,8 @@ function formatTime(minutes: number, isHours: boolean = false): string {
 /**
  * Calculate total hours equivalent for summary
  */
-function calculateTotalHours(pmMinutes: number, devHours: number): number {
-  return (pmMinutes / 60) + devHours;
+function calculateTotalHours(pmMinutes: number, devHours: number, designerHours: number): number {
+  return (pmMinutes / 60) + devHours + designerHours;
 }
 
 // Icon components
@@ -126,6 +132,25 @@ function CodeIcon({ className }: { className?: string }) {
   );
 }
 
+function PaletteIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+      />
+    </svg>
+  );
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -157,21 +182,26 @@ function ValueCard({ icon, label, timeValue, monetaryValue }: ValueCardProps) {
 /**
  * CostSavingsCard - Displays savings comparison between professional rates and AI costs
  *
- * Shows two-column layout with PM consulting and development time equivalents,
+ * Shows three-column layout with PM consulting, development, and designer time equivalents,
  * plus a bottom panel showing total value delivered vs actual AI cost.
  */
 export function CostSavingsCard({
   data,
   showDetailed = true,
 }: CostSavingsCardProps) {
-  const { pmMinutes, devHours, messageCount, filesGenerated, tokensUsed } = data;
+  const { settings } = useWageSettings();
+  const { pmMinutes, devHours, designerHours, messageCount, filesGenerated, tokensUsed } = data;
 
-  // Calculate values
-  const pmValue = calculatePmValue(pmMinutes);
-  const devValue = calculateDevValue(devHours);
-  const totalValue = pmValue + devValue;
+  // Calculate values using rates from settings
+  const pmValue = calculatePmValue(pmMinutes, settings.pmHourlyRate);
+  const devValue = calculateDevValue(devHours, settings.devHourlyRate);
+  const designerValue = calculateDesignerValue(designerHours, settings.designerHourlyRate);
+  const totalValue = pmValue + devValue + designerValue;
   const aiCost = calculateAiCost(tokensUsed);
-  const totalHours = calculateTotalHours(pmMinutes, devHours);
+  const totalHours = calculateTotalHours(pmMinutes, devHours, designerHours);
+
+  // Check if designer hours are present
+  const hasDesignerWork = designerHours > 0;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 md:p-6">
@@ -180,8 +210,8 @@ export function CostSavingsCard({
         Your Savings
       </h3>
 
-      {/* Two-column value cards */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      {/* Value cards - responsive grid */}
+      <div className={`grid gap-3 mb-4 ${hasDesignerWork ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
         <ValueCard
           icon={<UserIcon className="w-4 h-4 text-gray-400" />}
           label="PM Time"
@@ -194,6 +224,14 @@ export function CostSavingsCard({
           timeValue={formatTime(devHours, true)}
           monetaryValue={formatCurrency(devValue)}
         />
+        {hasDesignerWork && (
+          <ValueCard
+            icon={<PaletteIcon className="w-4 h-4 text-gray-400" />}
+            label="Design Time"
+            timeValue={formatTime(designerHours, true)}
+            monetaryValue={formatCurrency(designerValue)}
+          />
+        )}
       </div>
 
       {/* Total value panel */}
@@ -226,7 +264,7 @@ export function CostSavingsCard({
 
       {/* Disclaimer */}
       <p className="mt-4 text-xs text-gray-400">
-        * Estimates based on average industry rates. PM rate: ${PM_HOURLY_RATE}/hr, Dev rate: ${DEV_HOURLY_RATE}/hr.
+        * Estimates based on configured rates. PM: ${settings.pmHourlyRate}/hr, Dev: ${settings.devHourlyRate}/hr, Designer: ${settings.designerHourlyRate}/hr.
       </p>
     </div>
   );

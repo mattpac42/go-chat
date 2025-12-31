@@ -7,6 +7,7 @@ import { ProjectList } from '@/components/projects/ProjectList';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { FileExplorer } from '@/components/projects/FileExplorer';
 import { ProjectPreview } from '@/components/preview/ProjectPreview';
+import { PreviewModal } from '@/components/preview/PreviewModal';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useProjects, useProject } from '@/hooks/useProjects';
 import { useFiles } from '@/hooks/useFiles';
@@ -52,6 +53,7 @@ export function ProjectPageClient() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [rightPanelView, setRightPanelView] = useState<RightPanelView>('files');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Load preview files when files change and preview tab is active
   useEffect(() => {
@@ -311,6 +313,18 @@ export function ProjectPageClient() {
                 </svg>
               </button>
             )}
+            {rightPanelView === 'preview' && (
+              <button
+                onClick={() => setIsPreviewModalOpen(true)}
+                className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Open fullscreen preview"
+                aria-label="Open fullscreen preview"
+              >
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -347,6 +361,13 @@ export function ProjectPageClient() {
           </div>
         )}
       </aside>
+
+      {/* Fullscreen Preview Modal */}
+      <PreviewModal
+        files={previewFiles}
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+      />
     </div>
   );
 }

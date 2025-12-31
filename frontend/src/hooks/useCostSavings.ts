@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 import type { CostSavingsData } from '@/components/savings';
-
-// Rate constants (midpoint values)
-const PM_HOURLY_RATE = 80;        // $80/hr for PM consulting
-const DEV_HOURLY_RATE = 112.50;   // $112.50/hr for development
+import { useWageSettings, DEFAULT_WAGE_SETTINGS } from './useWageSettings';
 
 // AI cost per 1K tokens
 const INPUT_COST_PER_1K = 0.003;  // $0.003 per 1K input tokens
@@ -14,6 +11,7 @@ const INPUT_OUTPUT_RATIO = 0.6;   // 60% input, 40% output estimate
 const PM_MINUTES_PER_MESSAGE = 1.5;     // Each message represents ~1.5 min of PM thinking
 const DEV_HOURS_PER_FILE = 0.5;         // Each file represents ~30 min of dev work
 const DEV_HOURS_PER_100_MESSAGES = 0.25; // Additional dev time for message complexity
+const DESIGNER_HOURS_PER_MESSAGE = 0.5; // Each designer message represents ~30 min of design work
 const TOKENS_PER_MESSAGE = 500;         // Average tokens per message (both directions)
 
 /**
@@ -23,6 +21,7 @@ export interface SessionMetrics {
   messageCount: number;
   filesGenerated: number;
   tokensUsed?: number; // If available, use actual tokens; otherwise estimate
+  designerMessageCount?: number; // Count of messages from designer agent
 }
 
 /**
@@ -32,6 +31,7 @@ export interface CostSavingsResult {
   data: CostSavingsData;
   pmValue: number;
   devValue: number;
+  designerValue: number;
   totalValue: number;
   aiCost: number;
   savingsMultiplier: number; // How many times more value vs cost
@@ -56,6 +56,14 @@ function estimateDevHours(filesGenerated: number, messageCount: number): number 
 }
 
 /**
+ * Estimate designer hours based on designer message count
+ * Each substantial designer response represents ~30 min of design work
+ */
+function estimateDesignerHours(designerMessageCount: number): number {
+  return designerMessageCount * DESIGNER_HOURS_PER_MESSAGE;
+}
+
+/**
  * Estimate tokens if not provided
  */
 function estimateTokens(messageCount: number): number {
@@ -65,15 +73,22 @@ function estimateTokens(messageCount: number): number {
 /**
  * Calculate PM consulting value based on minutes spent
  */
-function calculatePmValue(minutes: number): number {
-  return (minutes / 60) * PM_HOURLY_RATE;
+function calculatePmValue(minutes: number, hourlyRate: number): number {
+  return (minutes / 60) * hourlyRate;
 }
 
 /**
  * Calculate development value based on hours spent
  */
-function calculateDevValue(hours: number): number {
-  return hours * DEV_HOURLY_RATE;
+function calculateDevValue(hours: number, hourlyRate: number): number {
+  return hours * hourlyRate;
+}
+
+/**
+ * Calculate designer value based on hours spent
+ */
+function calculateDesignerValue(hours: number, hourlyRate: number): number {
+  return hours * hourlyRate;
 }
 
 /**
@@ -93,7 +108,9 @@ function calculateAiCost(tokens: number): number {
 /**
  * Hook to calculate cost savings from session metrics
  *
- * @param metrics - Session metrics (messageCount, filesGenerated, optionally tokensUsed)
+ * Uses rates from the useWageSettings hook for calculations.
+ *
+ * @param metrics - Session metrics (messageCount, filesGenerated, optionally tokensUsed, designerMessageCount)
  * @returns Calculated savings data and computed values
  *
  * @example
@@ -101,6 +118,7 @@ function calculateAiCost(tokens: number): number {
  * const { data, totalValue, aiCost, savingsMultiplier } = useCostSavings({
  *   messageCount: 25,
  *   filesGenerated: 5,
+ *   designerMessageCount: 3,
  * });
  *
  * // Use with CostSavingsCard
@@ -108,18 +126,23 @@ function calculateAiCost(tokens: number): number {
  * ```
  */
 export function useCostSavings(metrics: SessionMetrics): CostSavingsResult {
+  const { settings } = useWageSettings();
+
   return useMemo(() => {
-    const { messageCount, filesGenerated, tokensUsed } = metrics;
+    const { messageCount, filesGenerated, tokensUsed, designerMessageCount = 0 } = metrics;
+    const { pmHourlyRate, devHourlyRate, designerHourlyRate } = settings;
 
     // Estimate or use provided values
     const pmMinutes = estimatePmMinutes(messageCount);
     const devHours = estimateDevHours(filesGenerated, messageCount);
+    const designerHours = estimateDesignerHours(designerMessageCount);
     const tokens = tokensUsed ?? estimateTokens(messageCount);
 
-    // Calculate monetary values
-    const pmValue = calculatePmValue(pmMinutes);
-    const devValue = calculateDevValue(devHours);
-    const totalValue = pmValue + devValue;
+    // Calculate monetary values using configured rates
+    const pmValue = calculatePmValue(pmMinutes, pmHourlyRate);
+    const devValue = calculateDevValue(devHours, devHourlyRate);
+    const designerValue = calculateDesignerValue(designerHours, designerHourlyRate);
+    const totalValue = pmValue + devValue + designerValue;
     const aiCost = calculateAiCost(tokens);
 
     // Calculate savings multiplier (how many times more value vs cost)
@@ -128,6 +151,7 @@ export function useCostSavings(metrics: SessionMetrics): CostSavingsResult {
     const data: CostSavingsData = {
       pmMinutes,
       devHours,
+      designerHours,
       messageCount,
       filesGenerated,
       tokensUsed: tokens,
@@ -137,20 +161,26 @@ export function useCostSavings(metrics: SessionMetrics): CostSavingsResult {
       data,
       pmValue,
       devValue,
+      designerValue,
       totalValue,
       aiCost,
       savingsMultiplier,
     };
-  }, [metrics]);
+  }, [metrics, settings]);
 }
 
 // Export calculation functions for direct use if needed
 export {
   calculatePmValue,
   calculateDevValue,
+  calculateDesignerValue,
   calculateAiCost,
   estimatePmMinutes,
   estimateDevHours,
-  PM_HOURLY_RATE,
-  DEV_HOURLY_RATE,
+  estimateDesignerHours,
 };
+
+// Export default rates for backward compatibility
+export const PM_HOURLY_RATE = DEFAULT_WAGE_SETTINGS.pmHourlyRate;
+export const DEV_HOURLY_RATE = DEFAULT_WAGE_SETTINGS.devHourlyRate;
+export const DESIGNER_HOURLY_RATE = DEFAULT_WAGE_SETTINGS.designerHourlyRate;

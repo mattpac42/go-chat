@@ -1,0 +1,1 @@
+export { WageSettingsModal } from './WageSettingsModal';
