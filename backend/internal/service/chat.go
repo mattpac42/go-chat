@@ -144,27 +144,11 @@ func (s *ChatService) ProcessMessage(
 		Bool("discoveryMode", discovery != nil && !discovery.Stage.IsComplete()).
 		Msg("sending message to Claude")
 
-	// Send to Claude
-	stream, err := s.claudeService.SendMessage(ctx, systemPrompt, claudeMessages)
+	// Send to Claude and handle tool use loop
+	responseContent, err := s.processStreamWithTools(ctx, projectID, systemPrompt, claudeMessages, onChunk)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send message to Claude: %w", err)
+		return nil, err
 	}
-	defer stream.Close()
-
-	// Collect full response while streaming chunks
-	var fullResponse strings.Builder
-	for chunk := range stream.Chunks() {
-		fullResponse.WriteString(chunk)
-		if onChunk != nil {
-			onChunk(chunk)
-		}
-	}
-
-	if err := stream.Err(); err != nil {
-		return nil, fmt.Errorf("stream error: %w", err)
-	}
-
-	responseContent := fullResponse.String()
 
 	// If in discovery mode, extract and save discovery data from response
 	if discovery != nil && !discovery.Stage.IsComplete() {
@@ -340,6 +324,238 @@ func (s *ChatService) getSystemPrompt(ctx context.Context, projectID uuid.UUID, 
 
 	// Fall back to default prompt
 	return DefaultSystemPrompt()
+}
+
+// processStreamWithTools handles streaming from Claude, executing tools, and continuing
+// the conversation until Claude returns a final response (not a tool_use).
+func (s *ChatService) processStreamWithTools(
+	ctx context.Context,
+	projectID uuid.UUID,
+	systemPrompt string,
+	claudeMessages []ClaudeMessage,
+	onChunk func(chunk string),
+) (string, error) {
+	// Initial request
+	stream, err := s.claudeService.SendMessage(ctx, systemPrompt, claudeMessages)
+	if err != nil {
+		return "", fmt.Errorf("failed to send message to Claude: %w", err)
+	}
+
+	var fullResponse strings.Builder
+	maxIterations := 10 // Prevent infinite loops
+
+	for iteration := 0; iteration < maxIterations; iteration++ {
+		// Collect response while streaming
+		var iterationResponse strings.Builder
+		for chunk := range stream.Chunks() {
+			iterationResponse.WriteString(chunk)
+			fullResponse.WriteString(chunk)
+			if onChunk != nil {
+				onChunk(chunk)
+			}
+		}
+
+		if err := stream.Err(); err != nil {
+			stream.Close()
+			return "", fmt.Errorf("stream error: %w", err)
+		}
+
+		// Check for tool uses
+		toolUses := stream.ToolUses()
+		stopReason := stream.StopReason()
+		stream.Close()
+
+		// If no tool uses or stop reason is not tool_use, we're done
+		if len(toolUses) == 0 || stopReason != "tool_use" {
+			break
+		}
+
+		s.logger.Debug().
+			Int("toolCount", len(toolUses)).
+			Str("projectId", projectID.String()).
+			Msg("executing tools")
+
+		// Execute tools and collect results
+		var toolResults []ToolResult
+		var assistantContent []ContentBlock
+
+		// Add text content block if there was text
+		if iterationResponse.Len() > 0 {
+			assistantContent = append(assistantContent, ContentBlock{
+				Type: "text",
+				Text: iterationResponse.String(),
+			})
+		}
+
+		// Add tool_use blocks and execute them
+		for _, toolUse := range toolUses {
+			assistantContent = append(assistantContent, ContentBlock{
+				Type:  "tool_use",
+				ID:    toolUse.ID,
+				Name:  toolUse.Name,
+				Input: toolUse.Input,
+			})
+
+			result := s.executeTool(ctx, projectID, toolUse)
+			toolResults = append(toolResults, result)
+
+			s.logger.Debug().
+				Str("toolName", toolUse.Name).
+				Str("toolID", toolUse.ID).
+				Bool("isError", result.IsError).
+				Msg("tool executed")
+		}
+
+		// Continue conversation with tool results
+		stream, err = s.claudeService.SendMessageWithToolResults(
+			ctx,
+			systemPrompt,
+			claudeMessages,
+			assistantContent,
+			toolResults,
+		)
+		if err != nil {
+			return "", fmt.Errorf("failed to continue with tool results: %w", err)
+		}
+	}
+
+	return fullResponse.String(), nil
+}
+
+// executeTool executes a single tool and returns the result.
+func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, toolUse ToolUseBlock) ToolResult {
+	result := ToolResult{
+		Type:      "tool_result",
+		ToolUseID: toolUse.ID,
+	}
+
+	switch toolUse.Name {
+	case "write_file":
+		path, _ := toolUse.Input["path"].(string)
+		content, _ := toolUse.Input["content"].(string)
+
+		if path == "" {
+			result.Content = "Error: path is required"
+			result.IsError = true
+			return result
+		}
+
+		if s.fileRepo == nil {
+			result.Content = "Error: file operations not available"
+			result.IsError = true
+			return result
+		}
+
+		// Infer language from file extension
+		language := inferLanguageFromPath(path)
+
+		_, err := s.fileRepo.SaveFile(ctx, projectID, path, language, content)
+		if err != nil {
+			result.Content = fmt.Sprintf("Error writing file: %v", err)
+			result.IsError = true
+			s.logger.Warn().
+				Err(err).
+				Str("path", path).
+				Str("projectId", projectID.String()).
+				Msg("failed to write file via tool")
+		} else {
+			result.Content = fmt.Sprintf("File written successfully: %s", path)
+			s.logger.Info().
+				Str("path", path).
+				Str("projectId", projectID.String()).
+				Msg("wrote file via tool")
+		}
+
+	case "read_file":
+		path, _ := toolUse.Input["path"].(string)
+
+		if path == "" {
+			result.Content = "Error: path is required"
+			result.IsError = true
+			return result
+		}
+
+		if s.fileRepo == nil {
+			result.Content = "Error: file operations not available"
+			result.IsError = true
+			return result
+		}
+
+		file, err := s.fileRepo.GetFileByPath(ctx, projectID, path)
+		if err != nil {
+			result.Content = fmt.Sprintf("Error reading file: %v", err)
+			result.IsError = true
+			s.logger.Warn().
+				Err(err).
+				Str("path", path).
+				Str("projectId", projectID.String()).
+				Msg("failed to read file via tool")
+		} else {
+			result.Content = file.Content
+			s.logger.Debug().
+				Str("path", path).
+				Str("projectId", projectID.String()).
+				Int("contentLength", len(file.Content)).
+				Msg("read file via tool")
+		}
+
+	default:
+		result.Content = fmt.Sprintf("Unknown tool: %s", toolUse.Name)
+		result.IsError = true
+	}
+
+	return result
+}
+
+// inferLanguageFromPath determines the programming language from a file path.
+func inferLanguageFromPath(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".html", ".htm":
+		return "html"
+	case ".css":
+		return "css"
+	case ".js":
+		return "javascript"
+	case ".ts":
+		return "typescript"
+	case ".tsx":
+		return "tsx"
+	case ".jsx":
+		return "jsx"
+	case ".go":
+		return "go"
+	case ".py":
+		return "python"
+	case ".json":
+		return "json"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".md":
+		return "markdown"
+	case ".sh":
+		return "bash"
+	case ".sql":
+		return "sql"
+	case ".xml":
+		return "xml"
+	case ".java":
+		return "java"
+	case ".rb":
+		return "ruby"
+	case ".rs":
+		return "rust"
+	case ".c":
+		return "c"
+	case ".cpp", ".cc":
+		return "cpp"
+	case ".h", ".hpp":
+		return "cpp"
+	case ".php":
+		return "php"
+	default:
+		return "text"
+	}
 }
 
 // inferFilenamesFromUserMessageWithMetadata extracts filenames mentioned in the user's message

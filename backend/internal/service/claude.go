@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 )
@@ -18,6 +19,24 @@ import (
 // ClaudeMessenger is the interface for sending messages to Claude (real or mock).
 type ClaudeMessenger interface {
 	SendMessage(ctx context.Context, systemPrompt string, messages []ClaudeMessage) (*ClaudeStream, error)
+	SendMessageWithToolResults(ctx context.Context, systemPrompt string, messages []ClaudeMessage, assistantContent []ContentBlock, toolResults []ToolResult) (*ClaudeStream, error)
+}
+
+// ContentBlock represents a content block in Claude's response (for re-sending in continuation).
+type ContentBlock struct {
+	Type  string                 `json:"type"`
+	Text  string                 `json:"text,omitempty"`
+	ID    string                 `json:"id,omitempty"`
+	Name  string                 `json:"name,omitempty"`
+	Input map[string]interface{} `json:"input,omitempty"`
+}
+
+// ToolResult represents a tool result to send back to Claude.
+type ToolResult struct {
+	Type      string `json:"type"`
+	ToolUseID string `json:"tool_use_id"`
+	Content   string `json:"content"`
+	IsError   bool   `json:"is_error,omitempty"`
 }
 
 // ClaudeVision is the interface for image analysis with Claude Vision.
@@ -30,11 +49,13 @@ const (
 	anthropicVersion    = "2023-06-01"
 	defaultSystemPrompt = `You are Go Chat. You create files for users.
 
-FILE FORMAT REQUIREMENT - READ CAREFULLY:
-Every code block MUST include a filename after the language, separated by a colon.
-Each file MUST start with YAML front matter containing metadata for the App Map.
+IMPORTANT: When creating files, ALWAYS use the write_file tool. Do not output code blocks with filenames - use the tool instead.
+When reading existing files, use the read_file tool.
 
-CORRECT FORMAT (files will be saved with metadata):
+For each file you create with write_file, provide a brief explanation of what the file does.
+
+FALLBACK FORMAT (only if tools are unavailable):
+If for any reason you cannot use tools, use this code block format:
 ` + "```" + `html:index.html
 ---
 short_description: Main homepage structure with navigation and hero section
@@ -45,41 +66,7 @@ functional_group: Homepage
 <html>content</html>
 ` + "```" + `
 
-` + "```" + `css:styles.css
----
-short_description: Visual styling for the homepage
-long_description: Contains all CSS rules for the homepage including responsive layout, typography, colors, and component styles.
-functional_group: Homepage
----
-body { }
-` + "```" + `
-
-` + "```" + `javascript:app.js
----
-short_description: Homepage interactive functionality
-long_description: Handles user interactions on the homepage including navigation menu toggle, form validation, and dynamic content loading.
-functional_group: Homepage
----
-code here
-` + "```" + `
-
-METADATA FIELDS (all required in YAML front matter):
-- short_description: One sentence (max 100 chars) describing what this file does
-- long_description: Detailed explanation of the file's purpose and contents (2-3 sentences)
-- functional_group: The feature area this file belongs to (e.g., Homepage, Contact Form, Navigation, Backend Services, Authentication, Configuration, Utilities)
-
-WRONG FORMAT (files will NOT be saved):
-` + "```" + `html
-content
-` + "```" + `
-
-The pattern is: ` + "```" + `LANGUAGE:FILENAME followed by YAML front matter
-
-Always include both the language AND filename with a colon between them.
-Always include the YAML front matter metadata block.
-Without the filename, the code will not be saved to the project.
-
-Be concise. Generate working code with complete metadata.`
+Be concise. Generate working code.`
 )
 
 // ClaudeConfig holds configuration for the Claude service.
@@ -114,6 +101,70 @@ type claudeRequest struct {
 	System    string          `json:"system"`
 	Messages  []ClaudeMessage `json:"messages"`
 	Stream    bool            `json:"stream"`
+	Tools     []ClaudeTool    `json:"tools,omitempty"`
+}
+
+// claudeRequestWithContent is the request body when messages include content arrays (for tool results).
+type claudeRequestWithContent struct {
+	Model     string                   `json:"model"`
+	MaxTokens int                      `json:"max_tokens"`
+	System    string                   `json:"system"`
+	Messages  []map[string]interface{} `json:"messages"`
+	Stream    bool                     `json:"stream"`
+	Tools     []ClaudeTool             `json:"tools,omitempty"`
+}
+
+// ClaudeTool represents a tool definition for the Claude API.
+type ClaudeTool struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	InputSchema map[string]interface{} `json:"input_schema"`
+}
+
+// ToolUseBlock represents a tool_use content block from Claude's response.
+type ToolUseBlock struct {
+	Type  string                 `json:"type"`
+	ID    string                 `json:"id"`
+	Name  string                 `json:"name"`
+	Input map[string]interface{} `json:"input"`
+}
+
+// getFileTools returns the tool definitions for file operations.
+func getFileTools() []ClaudeTool {
+	return []ClaudeTool{
+		{
+			Name:        "write_file",
+			Description: "Create or overwrite a file in the project. Use this for ALL file creation.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "File path relative to project root (e.g., 'src/index.html', 'styles/main.css')",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "Complete file content to write",
+					},
+				},
+				"required": []string{"path", "content"},
+			},
+		},
+		{
+			Name:        "read_file",
+			Description: "Read the contents of a file in the project",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "File path relative to project root",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+	}
 }
 
 // claudeVisionRequest is the request body for the Claude Vision API.
@@ -169,12 +220,17 @@ type claudeStreamEvent struct {
 	Type         string `json:"type"`
 	Index        int    `json:"index,omitempty"`
 	ContentBlock *struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type  string `json:"type"`
+		Text  string `json:"text,omitempty"`
+		ID    string `json:"id,omitempty"`    // For tool_use blocks
+		Name  string `json:"name,omitempty"`  // For tool_use blocks
+		Input json.RawMessage `json:"input,omitempty"` // For tool_use blocks
 	} `json:"content_block,omitempty"`
 	Delta *struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
+		Type        string `json:"type"`
+		Text        string `json:"text,omitempty"`
+		PartialJSON string `json:"partial_json,omitempty"` // For tool input streaming
+		StopReason  string `json:"stop_reason,omitempty"`  // For message_delta
 	} `json:"delta,omitempty"`
 	Message *struct {
 		ID   string `json:"id"`
@@ -184,10 +240,13 @@ type claudeStreamEvent struct {
 
 // ClaudeStream represents a streaming response from Claude.
 type ClaudeStream struct {
-	chunks chan string
-	err    error
-	done   chan struct{}
-	resp   *http.Response
+	chunks     chan string
+	err        error
+	done       chan struct{}
+	resp       *http.Response
+	toolUses   []ToolUseBlock
+	stopReason string
+	mu         sync.Mutex
 }
 
 // Chunks returns a channel of text chunks from the stream.
@@ -198,6 +257,20 @@ func (s *ClaudeStream) Chunks() <-chan string {
 // Err returns any error that occurred during streaming.
 func (s *ClaudeStream) Err() error {
 	return s.err
+}
+
+// ToolUses returns any tool_use blocks received during streaming.
+func (s *ClaudeStream) ToolUses() []ToolUseBlock {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.toolUses
+}
+
+// StopReason returns the stop reason from the message (e.g., "end_turn", "tool_use").
+func (s *ClaudeStream) StopReason() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stopReason
 }
 
 // Close closes the stream and releases resources.
@@ -241,13 +314,14 @@ func (s *ClaudeService) SendMessage(ctx context.Context, systemPrompt string, me
 		}
 	}
 
-	// Build request
+	// Build request with file tools
 	reqBody := claudeRequest{
 		Model:     s.config.Model,
 		MaxTokens: s.config.MaxTokens,
 		System:    systemPrompt,
 		Messages:  messages,
 		Stream:    true,
+		Tools:     getFileTools(),
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -299,6 +373,126 @@ func (s *ClaudeService) SendMessage(ctx context.Context, systemPrompt string, me
 	return stream, nil
 }
 
+// SendMessageWithToolResults sends messages to Claude including tool results from previous tool uses.
+// This is used to continue a conversation after executing tools.
+func (s *ClaudeService) SendMessageWithToolResults(
+	ctx context.Context,
+	systemPrompt string,
+	messages []ClaudeMessage,
+	assistantContent []ContentBlock,
+	toolResults []ToolResult,
+) (*ClaudeStream, error) {
+	// Build messages array with content blocks for tool results
+	var msgArray []map[string]interface{}
+
+	// Add previous conversation messages (string content)
+	for _, msg := range messages {
+		msgArray = append(msgArray, map[string]interface{}{
+			"role":    msg.Role,
+			"content": msg.Content,
+		})
+	}
+
+	// Add assistant message with the tool_use content blocks
+	if len(assistantContent) > 0 {
+		contentArray := make([]map[string]interface{}, len(assistantContent))
+		for i, block := range assistantContent {
+			contentArray[i] = map[string]interface{}{
+				"type": block.Type,
+			}
+			if block.Type == "text" {
+				contentArray[i]["text"] = block.Text
+			} else if block.Type == "tool_use" {
+				contentArray[i]["id"] = block.ID
+				contentArray[i]["name"] = block.Name
+				contentArray[i]["input"] = block.Input
+			}
+		}
+		msgArray = append(msgArray, map[string]interface{}{
+			"role":    "assistant",
+			"content": contentArray,
+		})
+	}
+
+	// Add user message with tool results
+	if len(toolResults) > 0 {
+		resultArray := make([]map[string]interface{}, len(toolResults))
+		for i, result := range toolResults {
+			resultArray[i] = map[string]interface{}{
+				"type":        "tool_result",
+				"tool_use_id": result.ToolUseID,
+				"content":     result.Content,
+			}
+			if result.IsError {
+				resultArray[i]["is_error"] = true
+			}
+		}
+		msgArray = append(msgArray, map[string]interface{}{
+			"role":    "user",
+			"content": resultArray,
+		})
+	}
+
+	// Build request with file tools
+	reqBody := claudeRequestWithContent{
+		Model:     s.config.Model,
+		MaxTokens: s.config.MaxTokens,
+		System:    systemPrompt,
+		Messages:  msgArray,
+		Stream:    true,
+		Tools:     getFileTools(),
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.config.BaseURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", s.config.APIKey)
+	req.Header.Set("anthropic-version", anthropicVersion)
+
+	s.logger.Debug().
+		Str("model", s.config.Model).
+		Int("messageCount", len(msgArray)).
+		Int("toolResults", len(toolResults)).
+		Msg("sending request to Claude API with tool results")
+
+	// Send request
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+
+	// Check for error response
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+
+		var errResp claudeErrorResponse
+		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
+			return nil, fmt.Errorf("Claude API error: %s", errResp.Error.Message)
+		}
+		return nil, fmt.Errorf("Claude API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Start streaming
+	stream := &ClaudeStream{
+		chunks: make(chan string, 100),
+		done:   make(chan struct{}),
+		resp:   resp,
+	}
+
+	go s.processStream(resp, stream)
+
+	return stream, nil
+}
+
 // processStream reads SSE events from the response and sends text chunks.
 func (s *ClaudeService) processStream(resp *http.Response, stream *ClaudeStream) {
 	defer close(stream.chunks)
@@ -311,6 +505,15 @@ func (s *ClaudeService) processStream(resp *http.Response, stream *ClaudeStream)
 	scanner.Buffer(buf, 1024*1024)
 
 	var currentEvent string
+
+	// Track current content blocks by index (for tool_use blocks that stream JSON)
+	type contentBlockState struct {
+		blockType   string
+		toolID      string
+		toolName    string
+		partialJSON strings.Builder
+	}
+	contentBlocks := make(map[int]*contentBlockState)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -334,9 +537,76 @@ func (s *ClaudeService) processStream(resp *http.Response, stream *ClaudeStream)
 				continue
 			}
 
+			// Handle content_block_start - initialize tracking for tool_use blocks
+			if event.Type == "content_block_start" && event.ContentBlock != nil {
+				state := &contentBlockState{
+					blockType: event.ContentBlock.Type,
+				}
+				if event.ContentBlock.Type == "tool_use" {
+					state.toolID = event.ContentBlock.ID
+					state.toolName = event.ContentBlock.Name
+					s.logger.Debug().
+						Str("toolID", state.toolID).
+						Str("toolName", state.toolName).
+						Int("index", event.Index).
+						Msg("started tool_use content block")
+				}
+				contentBlocks[event.Index] = state
+			}
+
 			// Extract text from content_block_delta events
-			if event.Type == "content_block_delta" && event.Delta != nil && event.Delta.Type == "text_delta" {
-				stream.chunks <- event.Delta.Text
+			if event.Type == "content_block_delta" && event.Delta != nil {
+				if event.Delta.Type == "text_delta" {
+					stream.chunks <- event.Delta.Text
+				} else if event.Delta.Type == "input_json_delta" {
+					// Accumulate partial JSON for tool input
+					if state, ok := contentBlocks[event.Index]; ok {
+						state.partialJSON.WriteString(event.Delta.PartialJSON)
+					}
+				}
+			}
+
+			// Handle content_block_stop - finalize tool_use blocks
+			if event.Type == "content_block_stop" {
+				if state, ok := contentBlocks[event.Index]; ok && state.blockType == "tool_use" {
+					// Parse the accumulated JSON input
+					var input map[string]interface{}
+					jsonStr := state.partialJSON.String()
+					if jsonStr != "" {
+						if err := json.Unmarshal([]byte(jsonStr), &input); err != nil {
+							s.logger.Warn().
+								Err(err).
+								Str("json", jsonStr).
+								Msg("failed to parse tool input JSON")
+						}
+					}
+
+					// Add the tool use to the stream
+					toolUse := ToolUseBlock{
+						Type:  "tool_use",
+						ID:    state.toolID,
+						Name:  state.toolName,
+						Input: input,
+					}
+					stream.mu.Lock()
+					stream.toolUses = append(stream.toolUses, toolUse)
+					stream.mu.Unlock()
+
+					s.logger.Debug().
+						Str("toolID", state.toolID).
+						Str("toolName", state.toolName).
+						Interface("input", input).
+						Msg("completed tool_use content block")
+
+					delete(contentBlocks, event.Index)
+				}
+			}
+
+			// Handle message_delta for stop_reason
+			if event.Type == "message_delta" && event.Delta != nil && event.Delta.StopReason != "" {
+				stream.mu.Lock()
+				stream.stopReason = event.Delta.StopReason
+				stream.mu.Unlock()
 			}
 
 			// Log other event types for debugging

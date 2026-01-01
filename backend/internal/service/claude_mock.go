@@ -479,6 +479,20 @@ func (m *MockClaudeService) GetStageHistory() []DiscoveryStage {
 	return history
 }
 
+// SendMessageWithToolResults implements ClaudeMessenger interface for the mock service.
+// It handles tool result continuation in the mock service.
+func (m *MockClaudeService) SendMessageWithToolResults(
+	ctx context.Context,
+	systemPrompt string,
+	messages []ClaudeMessage,
+	assistantContent []ContentBlock,
+	toolResults []ToolResult,
+) (*ClaudeStream, error) {
+	// For mock purposes, just return a simple continuation response
+	// Real implementation would continue the conversation
+	return m.createMockStream("I've processed the tool results and completed the operation."), nil
+}
+
 // AnalyzeImage implements ClaudeVision interface for the mock service.
 // It returns a mock description of the image for testing purposes.
 func (m *MockClaudeService) AnalyzeImage(ctx context.Context, imageData []byte, mimeType, prompt string) (string, error) {
