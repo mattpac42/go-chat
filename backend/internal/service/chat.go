@@ -72,11 +72,13 @@ type ChatResult struct {
 // ProcessMessage handles a user message and streams the AI response.
 // It saves both the user message and assistant response to the database.
 // The onChunk callback is called for each streaming chunk received.
+// The onFileCreated callback is called when a file is created/updated via tool use.
 func (s *ChatService) ProcessMessage(
 	ctx context.Context,
 	projectID uuid.UUID,
 	content string,
 	onChunk func(chunk string),
+	onFileCreated func(filePath string),
 ) (*ChatResult, error) {
 	// Verify project exists
 	_, err := s.repo.GetByID(ctx, projectID)
@@ -145,7 +147,7 @@ func (s *ChatService) ProcessMessage(
 		Msg("sending message to Claude")
 
 	// Send to Claude and handle tool use loop
-	responseContent, err := s.processStreamWithTools(ctx, projectID, systemPrompt, claudeMessages, onChunk)
+	responseContent, err := s.processStreamWithTools(ctx, projectID, systemPrompt, claudeMessages, onChunk, onFileCreated)
 	if err != nil {
 		return nil, err
 	}
@@ -334,6 +336,7 @@ func (s *ChatService) processStreamWithTools(
 	systemPrompt string,
 	claudeMessages []ClaudeMessage,
 	onChunk func(chunk string),
+	onFileCreated func(filePath string),
 ) (string, error) {
 	// Initial request
 	stream, err := s.claudeService.SendMessage(ctx, systemPrompt, claudeMessages)
@@ -396,14 +399,19 @@ func (s *ChatService) processStreamWithTools(
 				Input: toolUse.Input,
 			})
 
-			result := s.executeTool(ctx, projectID, toolUse)
-			toolResults = append(toolResults, result)
+			execResult := s.executeTool(ctx, projectID, toolUse)
+			toolResults = append(toolResults, execResult.Result)
 
 			s.logger.Debug().
 				Str("toolName", toolUse.Name).
 				Str("toolID", toolUse.ID).
-				Bool("isError", result.IsError).
+				Bool("isError", execResult.Result.IsError).
 				Msg("tool executed")
+
+			// Notify about file creation if callback is provided
+			if execResult.CreatedFile != "" && onFileCreated != nil {
+				onFileCreated(execResult.CreatedFile)
+			}
 		}
 
 		// Continue conversation with tool results
@@ -422,12 +430,19 @@ func (s *ChatService) processStreamWithTools(
 	return fullResponse.String(), nil
 }
 
+// ToolExecutionResult contains the result of executing a tool.
+type ToolExecutionResult struct {
+	Result        ToolResult
+	CreatedFile   string // Path of file created (empty if none)
+}
+
 // executeTool executes a single tool and returns the result.
-func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, toolUse ToolUseBlock) ToolResult {
+func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, toolUse ToolUseBlock) ToolExecutionResult {
 	result := ToolResult{
 		Type:      "tool_result",
 		ToolUseID: toolUse.ID,
 	}
+	execResult := ToolExecutionResult{Result: result}
 
 	switch toolUse.Name {
 	case "write_file":
@@ -435,15 +450,15 @@ func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, tool
 		content, _ := toolUse.Input["content"].(string)
 
 		if path == "" {
-			result.Content = "Error: path is required"
-			result.IsError = true
-			return result
+			execResult.Result.Content = "Error: path is required"
+			execResult.Result.IsError = true
+			return execResult
 		}
 
 		if s.fileRepo == nil {
-			result.Content = "Error: file operations not available"
-			result.IsError = true
-			return result
+			execResult.Result.Content = "Error: file operations not available"
+			execResult.Result.IsError = true
+			return execResult
 		}
 
 		// Infer language from file extension
@@ -451,15 +466,16 @@ func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, tool
 
 		_, err := s.fileRepo.SaveFile(ctx, projectID, path, language, content)
 		if err != nil {
-			result.Content = fmt.Sprintf("Error writing file: %v", err)
-			result.IsError = true
+			execResult.Result.Content = fmt.Sprintf("Error writing file: %v", err)
+			execResult.Result.IsError = true
 			s.logger.Warn().
 				Err(err).
 				Str("path", path).
 				Str("projectId", projectID.String()).
 				Msg("failed to write file via tool")
 		} else {
-			result.Content = fmt.Sprintf("File written successfully: %s", path)
+			execResult.Result.Content = fmt.Sprintf("File written successfully: %s", path)
+			execResult.CreatedFile = path
 			s.logger.Info().
 				Str("path", path).
 				Str("projectId", projectID.String()).
@@ -470,28 +486,28 @@ func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, tool
 		path, _ := toolUse.Input["path"].(string)
 
 		if path == "" {
-			result.Content = "Error: path is required"
-			result.IsError = true
-			return result
+			execResult.Result.Content = "Error: path is required"
+			execResult.Result.IsError = true
+			return execResult
 		}
 
 		if s.fileRepo == nil {
-			result.Content = "Error: file operations not available"
-			result.IsError = true
-			return result
+			execResult.Result.Content = "Error: file operations not available"
+			execResult.Result.IsError = true
+			return execResult
 		}
 
 		file, err := s.fileRepo.GetFileByPath(ctx, projectID, path)
 		if err != nil {
-			result.Content = fmt.Sprintf("Error reading file: %v", err)
-			result.IsError = true
+			execResult.Result.Content = fmt.Sprintf("Error reading file: %v", err)
+			execResult.Result.IsError = true
 			s.logger.Warn().
 				Err(err).
 				Str("path", path).
 				Str("projectId", projectID.String()).
 				Msg("failed to read file via tool")
 		} else {
-			result.Content = file.Content
+			execResult.Result.Content = file.Content
 			s.logger.Debug().
 				Str("path", path).
 				Str("projectId", projectID.String()).
@@ -500,11 +516,11 @@ func (s *ChatService) executeTool(ctx context.Context, projectID uuid.UUID, tool
 		}
 
 	default:
-		result.Content = fmt.Sprintf("Unknown tool: %s", toolUse.Name)
-		result.IsError = true
+		execResult.Result.Content = fmt.Sprintf("Unknown tool: %s", toolUse.Name)
+		execResult.Result.IsError = true
 	}
 
-	return result
+	return execResult
 }
 
 // inferLanguageFromPath determines the programming language from a file path.

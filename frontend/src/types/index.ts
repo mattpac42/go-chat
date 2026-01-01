@@ -129,13 +129,14 @@ export interface ClientMessage {
 }
 
 export interface ServerMessage {
-  type: 'message_start' | 'message_chunk' | 'message_complete' | 'error';
+  type: 'message_start' | 'message_chunk' | 'message_complete' | 'error' | 'files_updated';
   projectId: string;
   messageId: string;
   content?: string;
   fullContent?: string;
   agentType?: AgentType;
   error?: string;
+  filePaths?: string[]; // For files_updated event
 }
 
 // Connection status

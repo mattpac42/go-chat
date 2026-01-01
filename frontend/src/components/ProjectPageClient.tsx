@@ -263,6 +263,7 @@ export function ProjectPageClient() {
             initialMessages={initialMessages}
             onMenuClick={handleMenuClick}
             onStreamingComplete={fetchFiles}
+            onFilesUpdated={fetchFiles}
             onDiscoveryConfirmed={fetchProjects}
             onRefetchMessages={fetchProject}
             onTitleUpdate={handleTitleUpdate}

@@ -50,6 +50,13 @@ type ErrorResponse struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// FilesUpdatedResponse is sent when files are created or updated via tool use.
+type FilesUpdatedResponse struct {
+	Type      string    `json:"type"`
+	FilePaths []string  `json:"filePaths"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // WebSocketHandler handles WebSocket connections.
 type WebSocketHandler struct {
 	chatService *service.ChatService
@@ -152,12 +159,17 @@ func (h *WebSocketHandler) handleChatMessage(ctx context.Context, conn *websocke
 		}
 	}
 
+	// Callback for file creation events - send immediately when files are created
+	onFileCreated := func(filePath string) {
+		h.sendFilesUpdated(conn, mu, []string{filePath})
+	}
+
 	// Create a context with timeout for the Claude API call
 	// 180 seconds allows for longer responses (detailed code comments, multiple files)
 	chatCtx, cancel := context.WithTimeout(ctx, 180*time.Second)
 	defer cancel()
 
-	result, err := h.chatService.ProcessMessage(chatCtx, projectID, msg.Content, onChunk)
+	result, err := h.chatService.ProcessMessage(chatCtx, projectID, msg.Content, onChunk, onFileCreated)
 	if err != nil {
 		h.logger.Error().Err(err).
 			Str("projectId", projectID.String()).
@@ -209,4 +221,22 @@ func (h *WebSocketHandler) sendError(conn *websocket.Conn, mu *sync.Mutex, error
 		Timestamp: time.Now().UTC(),
 	}
 	conn.WriteJSON(response)
+}
+
+func (h *WebSocketHandler) sendFilesUpdated(conn *websocket.Conn, mu *sync.Mutex, filePaths []string) {
+	if len(filePaths) == 0 {
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	response := FilesUpdatedResponse{
+		Type:      "files_updated",
+		FilePaths: filePaths,
+		Timestamp: time.Now().UTC(),
+	}
+	if err := conn.WriteJSON(response); err != nil {
+		h.logger.Error().Err(err).Msg("failed to send files_updated event")
+	}
 }

@@ -7,6 +7,7 @@ import { useWebSocket } from './useWebSocket';
 interface UseChatOptions {
   projectId: string;
   initialMessages?: Message[];
+  onFilesUpdated?: () => void;
 }
 
 interface UseChatReturn {
@@ -32,7 +33,7 @@ const CONNECTION_ERROR_DELAY = 800;
  * - Manages loading states during AI response
  * - Provides error handling and reconnection
  */
-export function useChat({ projectId, initialMessages = [] }: UseChatOptions): UseChatReturn {
+export function useChat({ projectId, initialMessages = [], onFilesUpdated }: UseChatOptions): UseChatReturn {
   const [state, setState] = useState<ChatState>({
     messages: initialMessages,
     isLoading: false,
@@ -141,8 +142,14 @@ export function useChat({ projectId, initialMessages = [] }: UseChatOptions): Us
         }
         break;
       }
+
+      case 'files_updated': {
+        // Trigger file refresh callback when files are created/updated via tool use
+        onFilesUpdated?.();
+        break;
+      }
     }
-  }, [projectId]);
+  }, [projectId, onFilesUpdated]);
 
   /**
    * Clear any pending error timeout

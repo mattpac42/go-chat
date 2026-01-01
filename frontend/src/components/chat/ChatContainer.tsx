@@ -22,6 +22,7 @@ interface ChatContainerProps {
   initialMessages?: Message[];
   onMenuClick?: () => void;
   onStreamingComplete?: () => void;
+  onFilesUpdated?: () => void;
   onDiscoveryConfirmed?: () => void;
   onRefetchMessages?: () => Promise<void>;
   onTitleUpdate?: (newTitle: string) => Promise<void>;
@@ -33,6 +34,7 @@ export function ChatContainer({
   initialMessages = [],
   onMenuClick,
   onStreamingComplete,
+  onFilesUpdated,
   onDiscoveryConfirmed,
   onRefetchMessages,
   onTitleUpdate,
@@ -49,6 +51,7 @@ export function ChatContainer({
   } = useChat({
     projectId,
     initialMessages,
+    onFilesUpdated,
   });
 
   // Discovery integration
