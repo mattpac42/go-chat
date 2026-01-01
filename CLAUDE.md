@@ -51,6 +51,24 @@ Context: 🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛ 
 3. **Use skills** for workflows (PRD creation, task management, etc.)
 4. **Parallel execution**: Run independent agent tasks simultaneously
 5. **Beads for state**: Track execution in `.beads/` - no handoff files needed
+6. **Track with beads**: Create beads for non-trivial tasks, update as you work
+
+## Beads Workflow
+
+Beads tracks work persistently across sessions. **Always use beads for non-trivial work.**
+
+| When | Command | Example |
+|------|---------|---------|
+| Session start | `beads context` | See what to work on |
+| Starting task | `beads add "title"` | `beads add "Add dark mode" --type feature` |
+| Working on it | `beads progress <id>` | `beads progress bd-a1b2` |
+| Task done | `beads close <id>` | `beads close bd-a1b2 --note "Added ThemeProvider"` |
+| Session end | Commit `.beads/` | `git add .beads/ && git commit` |
+
+**Script location:** `python3 .claude/skills/beads/scripts/beads.py`
+
+**What to track:** Features, bug fixes, refactors, investigations taking >10 min or touching >1 file.
+**What to skip:** Quick answers, single-line fixes, research questions.
 
 ## Key Files
 
