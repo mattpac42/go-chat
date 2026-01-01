@@ -1,4 +1,7 @@
+- in the project list on the left, pull down the chevron to see the phases/epics that you've completed and those that you are working on and those to come
 - who am I? agent profiles, like you have in Slack, be able to change how they act or what they focus on
+- introduction of the Agents or asking each agent to introduce themselves if they haven't yet
+- what about a plant that we follow that grows when we are building our app?
 - auto compacting the messages, when you are creating something, so all messages for a particular task are summarized and then grouped together to show you what you did for those 50 messages, like zooming out on a high level project, or something like that
 - once the chat gets too long, can we summarize the chat up above rather than having all the text in some way? I'd like to make sure that we don't use a ton of context at some point, so we can summarize and list out bullet points or something like that so someone doesn't need to read all the chat if they don't want to but can look at the high level of what's been done. Does that make sense? What does the team recommend or what options do they have for something like this?
 - if I refresh the page while it's generating a response I want to make sure I still get the message

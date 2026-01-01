@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { CompletenessReport } from '@/types';
+import { CompletenessWarning } from '../projects/CompletenessWarning';
 
 interface PreviewFile {
   path: string;
@@ -11,6 +13,8 @@ interface PreviewModalProps {
   files: PreviewFile[];
   isOpen: boolean;
   onClose: () => void;
+  completenessReport?: CompletenessReport | null;
+  onFixClick?: () => void;
 }
 
 type DeviceType = 'desktop' | 'tablet' | 'mobile';
@@ -205,9 +209,17 @@ function buildPreviewHtml(files: PreviewFile[]): string {
  * - Refresh button to reload the preview
  * - Close on Escape key or backdrop click
  */
-export function PreviewModal({ files, isOpen, onClose }: PreviewModalProps) {
+export function PreviewModal({ files, isOpen, onClose, completenessReport, onFixClick }: PreviewModalProps) {
   const [device, setDevice] = useState<DeviceType>('desktop');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showPreviewAnyway, setShowPreviewAnyway] = useState(false);
+
+  // Reset "show anyway" state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setShowPreviewAnyway(false);
+    }
+  }, [isOpen]);
 
   // Handle escape key
   useEffect(() => {
@@ -241,6 +253,10 @@ export function PreviewModal({ files, isOpen, onClose }: PreviewModalProps) {
   const previewHtml = buildPreviewHtml(files);
   const deviceWidth = DEVICE_WIDTHS[device];
   const isFullWidth = device === 'desktop';
+
+  // Determine if we should show the warning banner
+  const hasIssues = completenessReport && completenessReport.status !== 'pass';
+  const shouldBlockPreview = hasIssues && completenessReport.status === 'critical' && !showPreviewAnyway;
 
   return (
     <div
@@ -323,8 +339,19 @@ export function PreviewModal({ files, isOpen, onClose }: PreviewModalProps) {
           </div>
         </div>
 
+        {/* Completeness warning */}
+        {hasIssues && (
+          <div className="px-4 pt-4">
+            <CompletenessWarning
+              report={completenessReport}
+              onFixClick={onFixClick}
+              onDismiss={() => setShowPreviewAnyway(true)}
+            />
+          </div>
+        )}
+
         {/* Preview content */}
-        <div className="flex-1 overflow-hidden bg-gray-100 flex items-start justify-center p-4 rounded-b-xl">
+        <div className={`flex-1 overflow-hidden bg-gray-100 flex items-start justify-center p-4 rounded-b-xl ${shouldBlockPreview ? 'opacity-50 pointer-events-none' : ''}`}>
           {/* Device frame wrapper */}
           <div
             className={`bg-white h-full transition-all duration-300 ease-out ${

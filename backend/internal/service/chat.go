@@ -17,6 +17,51 @@ import (
 // filenamePattern matches common filename patterns like index.html, script.js, etc.
 var filenamePattern = regexp.MustCompile(`\b([a-zA-Z0-9_-]+\.(?:html|css|js|ts|tsx|jsx|go|py|rb|java|json|xml|yaml|yml|md|sh|sql))\b`)
 
+// inferFunctionalGroup determines a functional group based on filename/extension
+// when no explicit metadata is provided. Returns empty string for truly unknown types.
+func inferFunctionalGroup(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	name := strings.ToLower(filename)
+
+	// Check for specific file patterns first
+	switch {
+	case strings.Contains(name, "index") || strings.Contains(name, "home"):
+		return "User Interface"
+	case strings.Contains(name, "nav") || strings.Contains(name, "header") || strings.Contains(name, "footer"):
+		return "Navigation"
+	case strings.Contains(name, "config") || name == "package.json" || name == "tsconfig.json":
+		return "Configuration"
+	case strings.Contains(name, "readme") || strings.Contains(name, "doc"):
+		return "Documentation"
+	case strings.Contains(name, "test") || strings.Contains(name, "spec"):
+		return "Testing"
+	case strings.Contains(name, "api") || strings.Contains(name, "route"):
+		return "Backend Services"
+	case strings.Contains(name, "db") || strings.Contains(name, "migration") || strings.Contains(name, "schema"):
+		return "Database"
+	}
+
+	// Fall back to extension-based grouping
+	switch ext {
+	case ".html", ".css", ".scss", ".sass", ".less":
+		return "User Interface"
+	case ".js", ".ts", ".jsx", ".tsx":
+		return "Application Logic"
+	case ".go", ".py", ".rb", ".java", ".rs":
+		return "Backend Services"
+	case ".sql":
+		return "Database"
+	case ".json", ".yaml", ".yml", ".toml", ".env":
+		return "Configuration"
+	case ".md", ".txt", ".rst":
+		return "Documentation"
+	case ".sh", ".bash", ".zsh":
+		return "Scripts"
+	default:
+		return "" // Let it fall through to "Other" in frontend
+	}
+}
+
 // ChatConfig holds configuration for the chat service.
 type ChatConfig struct {
 	ContextMessageLimit int
@@ -24,14 +69,15 @@ type ChatConfig struct {
 
 // ChatService orchestrates chat interactions between WebSocket, Claude, and database.
 type ChatService struct {
-	config              ChatConfig
-	claudeService       ClaudeMessenger
-	discoveryService    *DiscoveryService
-	agentContextService *AgentContextService
-	repo                repository.ProjectRepository
-	fileRepo            repository.FileRepository
-	fileMetadataRepo    repository.FileMetadataRepository
-	logger              zerolog.Logger
+	config               ChatConfig
+	claudeService        ClaudeMessenger
+	discoveryService     *DiscoveryService
+	agentContextService  *AgentContextService
+	completenessChecker  *CompletenessChecker
+	repo                 repository.ProjectRepository
+	fileRepo             repository.FileRepository
+	fileMetadataRepo     repository.FileMetadataRepository
+	logger               zerolog.Logger
 }
 
 // NewChatService creates a new chat service.
@@ -48,25 +94,31 @@ func NewChatService(
 	if config.ContextMessageLimit <= 0 {
 		config.ContextMessageLimit = 20
 	}
+
+	// Create completeness checker
+	completenessChecker := NewCompletenessChecker(fileRepo, logger)
+
 	return &ChatService{
-		config:              config,
-		claudeService:       claudeService,
-		discoveryService:    discoveryService,
-		agentContextService: agentContextService,
-		repo:                repo,
-		fileRepo:            fileRepo,
-		fileMetadataRepo:    fileMetadataRepo,
-		logger:              logger,
+		config:               config,
+		claudeService:        claudeService,
+		discoveryService:     discoveryService,
+		agentContextService:  agentContextService,
+		completenessChecker:  completenessChecker,
+		repo:                 repo,
+		fileRepo:             fileRepo,
+		fileMetadataRepo:     fileMetadataRepo,
+		logger:               logger,
 	}
 }
 
 // ChatResult contains the result of processing a chat message.
 type ChatResult struct {
-	Message    *model.Message
-	Role       model.Role
-	Content    string
-	CodeBlocks []model.CodeBlock
-	AgentType  *string // "product_manager", "designer", "developer", or nil
+	Message             *model.Message
+	Role                model.Role
+	Content             string
+	CodeBlocks          []model.CodeBlock
+	AgentType           *string                   // "product_manager", "designer", "developer", or nil
+	CompletenessReport  *model.CompletenessReport // Report of missing files/broken references
 }
 
 // ProcessMessage handles a user message and streams the AI response.
@@ -211,27 +263,46 @@ func (s *ChatService) ProcessMessage(
 					Str("filename", block.Filename).
 					Msg("saved extracted file")
 
-				// Save metadata if available and repository is configured
-				if block.Metadata != nil && s.fileMetadataRepo != nil {
-					_, err := s.fileMetadataRepo.Upsert(
-						ctx,
-						file.ID,
-						block.Metadata.ShortDescription,
-						block.Metadata.LongDescription,
-						block.Metadata.FunctionalGroup,
-					)
-					if err != nil {
-						s.logger.Warn().
-							Err(err).
-							Str("projectId", projectID.String()).
-							Str("filename", block.Filename).
-							Msg("failed to save file metadata")
-					} else {
-						s.logger.Info().
-							Str("projectId", projectID.String()).
-							Str("filename", block.Filename).
-							Str("functionalGroup", block.Metadata.FunctionalGroup).
-							Msg("saved file metadata")
+				// Save metadata if repository is configured
+				if s.fileMetadataRepo != nil {
+					shortDesc := ""
+					longDesc := ""
+					funcGroup := ""
+
+					// Use explicit metadata if available
+					if block.Metadata != nil {
+						shortDesc = block.Metadata.ShortDescription
+						longDesc = block.Metadata.LongDescription
+						funcGroup = block.Metadata.FunctionalGroup
+					}
+
+					// Infer functional group from filename if not explicitly set
+					if funcGroup == "" {
+						funcGroup = inferFunctionalGroup(block.Filename)
+					}
+
+					// Only save if we have something to save
+					if shortDesc != "" || longDesc != "" || funcGroup != "" {
+						_, err := s.fileMetadataRepo.Upsert(
+							ctx,
+							file.ID,
+							shortDesc,
+							longDesc,
+							funcGroup,
+						)
+						if err != nil {
+							s.logger.Warn().
+								Err(err).
+								Str("projectId", projectID.String()).
+								Str("filename", block.Filename).
+								Msg("failed to save file metadata")
+						} else {
+							s.logger.Info().
+								Str("projectId", projectID.String()).
+								Str("filename", block.Filename).
+								Str("functionalGroup", funcGroup).
+								Msg("saved file metadata")
+						}
 					}
 				}
 			} else {
@@ -255,12 +326,31 @@ func (s *ChatService) ProcessMessage(
 		Int("codeBlocks", len(codeBlocks)).
 		Msg("completed message processing")
 
+	// Run completeness check if any files were created
+	var completenessReport *model.CompletenessReport
+	if len(codeBlocks) > 0 && s.completenessChecker != nil {
+		report, err := s.completenessChecker.Check(ctx, projectID)
+		if err != nil {
+			s.logger.Warn().Err(err).Msg("failed to run completeness check")
+		} else {
+			completenessReport = report
+			if report.HasCriticalIssues() {
+				s.logger.Warn().
+					Str("projectId", projectID.String()).
+					Int("criticalIssues", len(report.GetCriticalIssues())).
+					Strs("missingFiles", report.GetMissingFiles()).
+					Msg("completeness check found critical issues")
+			}
+		}
+	}
+
 	return &ChatResult{
-		Message:    assistantMsg,
-		Role:       model.RoleAssistant,
-		Content:    responseContent,
-		CodeBlocks: codeBlocks,
-		AgentType:  agentType,
+		Message:            assistantMsg,
+		Role:               model.RoleAssistant,
+		Content:            responseContent,
+		CodeBlocks:         codeBlocks,
+		AgentType:          agentType,
+		CompletenessReport: completenessReport,
 	}, nil
 }
 

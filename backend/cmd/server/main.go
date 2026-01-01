@@ -100,6 +100,9 @@ func main() {
 		ContextMessageLimit: cfg.ContextMessageLimit,
 	}, claudeService, discoveryService, agentContextService, projectRepo, fileRepo, fileMetadataRepo, logger)
 
+	// Initialize completeness checker
+	completenessChecker := service.NewCompletenessChecker(fileRepo, logger)
+
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler(db)
 	projectHandler := handler.NewProjectHandler(projectRepo)
@@ -108,6 +111,7 @@ func main() {
 	discoveryHandler := handler.NewDiscoveryHandler(discoveryService, logger)
 	prdHandler := handler.NewPRDHandler(prdService, logger)
 	achievementHandler := handler.NewAchievementHandler(achievementSvc, nudgeSvc, logger)
+	completenessHandler := handler.NewCompletenessHandler(completenessChecker, logger)
 	wsHandler := handler.NewWebSocketHandler(chatService, logger)
 
 	// Set up Gin
@@ -156,6 +160,9 @@ func main() {
 			projects.GET("/:id/active-prd", prdHandler.GetActivePRD)
 			projects.PUT("/:id/active-prd", prdHandler.SetActivePRD)
 			projects.DELETE("/:id/active-prd", prdHandler.ClearActivePRD)
+
+			// Completeness check route
+			projects.GET("/:id/completeness", completenessHandler.GetCompleteness)
 		}
 		files := api.Group("/files")
 		{

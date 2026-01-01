@@ -440,8 +440,14 @@ type DiscoveryMetadata struct {
 var discoveryDataRegex = regexp.MustCompile(`<!--DISCOVERY_DATA:(.+?)-->`)
 
 // Fallback regex patterns for extracting data from visible response text
+// Multiple patterns for project name extraction (Claude uses various formats)
 var projectNameRegex = regexp.MustCompile(`(?i)(?:project(?:\s+name)?|app(?:lication)?|we(?:'ll|.ll)\s+call\s+(?:this|it)):\s*["']?([^"'\n]+?)["']?\s*(?:\n|$)`)
+var projectNameMarkdownRegex = regexp.MustCompile(`(?i)\*\*project(?:\s+name)?:?\*\*[:\s]*["']?([^"'\n*]+?)["']?\s*(?:\n|$)`)
+var projectNameBoldRegex = regexp.MustCompile(`(?i)project(?:\s+name)?[:\s]+\*\*([^*\n]+?)\*\*`)
+
+// Multiple patterns for solves statement extraction
 var solvesStatementRegex = regexp.MustCompile(`(?i)(?:solves|what\s+it\s+solves|problem\s+solved):\s*["']?([^"'\n]+?)["']?\s*(?:\n|$)`)
+var solvesMarkdownRegex = regexp.MustCompile(`(?i)\*\*(?:solves|what\s+it\s+solves):?\*\*[:\s]*["']?([^"'\n*]+?)["']?\s*(?:\n|$)`)
 
 // ExtractAndSaveData extracts structured data from Claude's response and saves it.
 func (s *DiscoveryService) ExtractAndSaveData(ctx context.Context, discoveryID uuid.UUID, response string) error {
@@ -607,17 +613,27 @@ func StripMetadata(response string) string {
 
 // extractProjectNameFromText attempts to find project name in visible response text.
 func extractProjectNameFromText(response string) string {
-	// Try common patterns like "Project: Name" or "Project Name: Name"
-	matches := projectNameRegex.FindStringSubmatch(response)
-	if len(matches) >= 2 {
-		name := strings.TrimSpace(matches[1])
-		// Clean up common suffixes that might be captured
-		name = strings.TrimSuffix(name, ".")
-		name = strings.TrimSuffix(name, ",")
-		// Only return if it looks like a valid name (1-5 words, not too long)
-		words := strings.Fields(name)
-		if len(words) >= 1 && len(words) <= 5 && len(name) <= 50 {
-			return name
+	// Try multiple patterns in order of specificity
+	patterns := []*regexp.Regexp{
+		projectNameMarkdownRegex, // **Project Name:** Value or **Project:** Value
+		projectNameBoldRegex,     // Project Name: **Value**
+		projectNameRegex,         // Project: Value or Project Name: Value
+	}
+
+	for _, pattern := range patterns {
+		matches := pattern.FindStringSubmatch(response)
+		if len(matches) >= 2 {
+			name := strings.TrimSpace(matches[1])
+			// Clean up common suffixes that might be captured
+			name = strings.TrimSuffix(name, ".")
+			name = strings.TrimSuffix(name, ",")
+			name = strings.TrimSuffix(name, ":")
+			name = strings.Trim(name, "*") // Remove any stray asterisks
+			// Only return if it looks like a valid name (1-5 words, not too long)
+			words := strings.Fields(name)
+			if len(words) >= 1 && len(words) <= 5 && len(name) <= 50 {
+				return name
+			}
 		}
 	}
 
@@ -633,7 +649,8 @@ func extractProjectNameFromText(response string) string {
 				strings.Contains(lower, "user") ||
 				strings.Contains(lower, "version") ||
 				strings.Contains(lower, "solves") ||
-				strings.Contains(lower, "coming") {
+				strings.Contains(lower, "coming") ||
+				strings.Contains(lower, "project") { // Skip "Project Name" labels
 				continue
 			}
 			// Check if it looks like a project name (title case, 1-4 words)
@@ -649,13 +666,22 @@ func extractProjectNameFromText(response string) string {
 
 // extractSolvesStatementFromText attempts to find solves statement in visible response text.
 func extractSolvesStatementFromText(response string) string {
-	matches := solvesStatementRegex.FindStringSubmatch(response)
-	if len(matches) >= 2 {
-		statement := strings.TrimSpace(matches[1])
-		statement = strings.TrimSuffix(statement, ".")
-		// Only return if it looks like a valid statement
-		if len(statement) >= 10 && len(statement) <= 200 {
-			return statement
+	// Try multiple patterns in order of specificity
+	patterns := []*regexp.Regexp{
+		solvesMarkdownRegex,   // **Solves:** Value or **What It Solves:** Value
+		solvesStatementRegex,  // Solves: Value or What It Solves: Value
+	}
+
+	for _, pattern := range patterns {
+		matches := pattern.FindStringSubmatch(response)
+		if len(matches) >= 2 {
+			statement := strings.TrimSpace(matches[1])
+			statement = strings.TrimSuffix(statement, ".")
+			statement = strings.Trim(statement, "*") // Remove any stray asterisks
+			// Only return if it looks like a valid statement
+			if len(statement) >= 10 && len(statement) <= 200 {
+				return statement
+			}
 		}
 	}
 	return ""

@@ -120,6 +120,32 @@ export interface FileMetadata {
   functionalGroup: string;
 }
 
+// Completeness check types
+export type ReportStatus = 'pass' | 'warning' | 'critical';
+export type Severity = 'critical' | 'warning' | 'info';
+
+export interface CompletenessIssue {
+  id: string;
+  severity: Severity;
+  type: string; // "missing_file", "syntax_error", "broken_reference"
+  missingFile?: string;
+  referencedBy?: string;
+  referenceType?: string; // "script", "stylesheet", "import", "image"
+  lineNumber?: number;
+  context?: string;
+  autoFixable: boolean;
+  fixApplied: boolean;
+}
+
+export interface CompletenessReport {
+  projectId: string;
+  checkedAt: string;
+  status: ReportStatus;
+  issues: CompletenessIssue[];
+  filesChecked: number;
+  autoFixable: number;
+}
+
 // WebSocket message types
 export interface ClientMessage {
   type: 'chat_message';
@@ -137,6 +163,7 @@ export interface ServerMessage {
   agentType?: AgentType;
   error?: string;
   filePaths?: string[]; // For files_updated event
+  completenessReport?: CompletenessReport; // For message_complete event
 }
 
 // Connection status

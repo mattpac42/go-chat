@@ -16,32 +16,116 @@ cat .claude/lineage.json 2>/dev/null
 
 **If lineage.json exists**, this is a rooted project:
 - Extract `garden.source_path` - the path to the parent Garden
+- Extract `garden.remote_url` - the git remote URL for remote sync
 - Extract `garden.commit_hash` - the commit the project was rooted from
 - Extract `included.agents` - list of agents currently in the project
-- Use the Garden source path as the sync source instead of a git remote
+
+**Determine sync source (local-first with remote fallback):**
+
+1. **Try local path first** - Check if `source_path` exists and is accessible:
+   ```bash
+   if [ -d "[garden_source_path]/.claude" ]; then
+       echo "Using local Garden at: [garden_source_path]"
+       GARDEN_PATH="[garden_source_path]"
+   fi
+   ```
+
+2. **Fall back to remote** - If local path unavailable and `remote_url` is set:
+   ```bash
+   if [ ! -d "[garden_source_path]/.claude" ] && [ -n "[remote_url]" ]; then
+       echo "Local Garden not accessible, cloning from remote..."
+       TEMP_GARDEN=$(mktemp -d)
+       git clone --depth 1 "[remote_url]" "$TEMP_GARDEN"
+       GARDEN_PATH="$TEMP_GARDEN"
+       # Remember to clean up: rm -rf "$TEMP_GARDEN" when done
+   fi
+   ```
+
+3. **Neither available** - Show error with remediation:
+   ```
+   ERROR: Cannot access Garden for sync.
+
+   Local path not found: [source_path]
+   Remote URL not set: [remote_url is null]
+
+   To fix:
+   1. Update lineage.json with correct source_path, OR
+   2. Add remote_url to lineage.json:
+      "garden": { "remote_url": "https://github.com/user/the_garden" }
+   ```
 
 **For rooted projects**, modify the sync workflow:
-1. Compare against the Garden's current state (not a git remote)
+1. Compare against the Garden (using GARDEN_PATH from above)
 2. Show which agents have been updated in the Garden
 3. Offer to sync specific agents that have new versions
 4. Update lineage.json with new sync timestamp after syncing
+5. Clean up temp directory if remote was used
 
 **Example lineage-based sync:**
 ```bash
-# Compare agents
-diff -r .claude/agents/ [garden_source_path]/.claude/agents/
+# Compare agents (using resolved GARDEN_PATH)
+diff -r .claude/agents/ "$GARDEN_PATH/.claude/agents/"
 
 # Compare specific agent
-diff .claude/agents/developer.md [garden_source_path]/.claude/agents/developer.md
+diff .claude/agents/developer.md "$GARDEN_PATH/.claude/agents/developer.md"
 
 # Compare skills
-diff -r .claude/skills/ [garden_source_path]/.claude/skills/
+diff -r .claude/skills/ "$GARDEN_PATH/.claude/skills/"
 
 # Compare commands
-diff -r .claude/commands/ [garden_source_path]/.claude/commands/
+diff -r .claude/commands/ "$GARDEN_PATH/.claude/commands/"
 ```
 
 **If no lineage.json**, proceed with standard git remote workflow (Step 1).
+
+### Step 0.5: Version Comparison
+
+After reading lineage.json, compare Garden versions:
+
+```bash
+# Read current version from lineage
+jq -r '.garden.version // "unknown"' .claude/lineage.json
+
+# Read latest version from Garden (local path)
+cat [garden_source_path]/VERSION
+
+# Or from git remote if local path not accessible
+git show garden/main:VERSION
+```
+
+**Display version delta:**
+```
+============================================================
+Version Update: 3.1.0 -> 3.2.0
+============================================================
+
+Changes in this update:
+  - Added: Version notification system for planted projects
+  - Changed: lineage.json schema (2.0 -> 2.1)
+
+See full changelog: /updates --changelog
+============================================================
+```
+
+If there are breaking changes, highlight them prominently:
+```
+BREAKING CHANGES in this update:
+  - lineage.json schema changed - will be auto-migrated
+  - [Other breaking changes]
+
+Review these changes before proceeding.
+```
+
+**Show CHANGELOG.md summary:**
+```bash
+# From local Garden path
+cat [garden_source_path]/CHANGELOG.md | head -50
+
+# Or from git remote
+git show garden/main:CHANGELOG.md | head -50
+```
+
+Parse the changelog to show entries between current version and latest version.
 
 ### Step 1: Check for Baseline Remote
 
@@ -289,11 +373,30 @@ For projects rooted from The Garden (those with `.claude/lineage.json`), the syn
    ```bash
    cat .claude/lineage.json
    ```
-   Extract: `garden.source_path`, `included.agents`, `sync.last_sync`
+   Extract: `garden.source_path`, `garden.remote_url`, `included.agents`, `sync.last_sync`
 
-2. **Verify Garden Path**
-   - Check if the Garden source path still exists
-   - If not, ask user for updated path or suggest setting up git remote instead
+2. **Resolve Garden Path (local-first with remote fallback)**
+
+   a. Check if local `source_path` exists:
+   ```bash
+   [ -d "[source_path]/.claude" ] && echo "Local Garden accessible"
+   ```
+
+   b. If local unavailable, check `remote_url`:
+   ```bash
+   # Clone to temp directory for comparison
+   TEMP_GARDEN=$(mktemp -d)
+   git clone --depth 1 "[remote_url]" "$TEMP_GARDEN"
+   ```
+
+   c. Log which source is being used:
+   ```
+   Sync source: Local Garden at /path/to/garden
+   # OR
+   Sync source: Remote clone from https://github.com/user/the_garden
+   ```
+
+   d. If neither available, provide clear error and remediation steps
 
 3. **Compare Included Agents**
    For each agent in `included.agents`:
@@ -336,12 +439,36 @@ For projects rooted from The Garden (those with `.claude/lineage.json`), the syn
    ```json
    {
      "sync": {
-       "last_sync": "[current ISO timestamp]"
+       "last_sync": "[current ISO timestamp]",
+       "last_version": "[Garden version after sync]"
      },
      "garden": {
-       "commit_hash": "[current Garden commit]"
+       "commit_hash": "[current Garden commit]",
+       "version": "[current Garden version from VERSION file]"
      }
    }
+   ```
+
+   Use jq or Python to update:
+   ```bash
+   # Read current Garden version
+   GARDEN_VERSION=$(cat [garden_path]/VERSION)
+   GARDEN_COMMIT=$(git -C [garden_path] rev-parse HEAD | head -c 8)
+   TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+   # Update lineage.json (using Python for safety)
+   python3 -c "
+   import json
+   from datetime import datetime
+   with open('.claude/lineage.json', 'r') as f:
+       lineage = json.load(f)
+   lineage['garden']['version'] = '$GARDEN_VERSION'
+   lineage['garden']['commit_hash'] = '$GARDEN_COMMIT'
+   lineage['sync']['last_sync'] = '$TIMESTAMP'
+   lineage['sync']['last_version'] = '$GARDEN_VERSION'
+   with open('.claude/lineage.json', 'w') as f:
+       json.dump(lineage, f, indent=2)
+   "
    ```
 
 ### Lineage Sync Output Format
@@ -349,8 +476,15 @@ For projects rooted from The Garden (those with `.claude/lineage.json`), the syn
 ```
 # Garden Sync Analysis
 
+## Version Information
+- Your Version: [version from lineage.json]
+- Latest Version: [version from Garden VERSION file]
+- Update Available: [Yes/No]
+
 ## Lineage Information
-- Garden Source: [path]
+- Sync Source: [Local: /path/to/garden | Remote: https://github.com/user/the_garden]
+- Local Path: [source_path] [accessible/not accessible]
+- Remote URL: [remote_url or "not configured"]
 - Originally Rooted: [timestamp]
 - Last Sync: [timestamp or "never"]
 - Current Garden Commit: [hash]

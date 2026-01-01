@@ -348,6 +348,20 @@ func (r *PostgresDiscoveryRepository) AddFeature(ctx context.Context, feature *m
 		version = "v1"
 	}
 
+	// Check if feature with same name and version already exists for this discovery
+	// This prevents duplicates when metadata is extracted multiple times during streaming
+	checkQuery := `
+		SELECT id, discovery_id, name, priority, version, created_at
+		FROM discovery_features
+		WHERE discovery_id = $1 AND name = $2 AND version = $3
+	`
+	var existing model.DiscoveryFeature
+	err := r.db.GetContext(ctx, &existing, checkQuery, feature.DiscoveryID, feature.Name, version)
+	if err == nil {
+		// Feature already exists, return it without inserting duplicate
+		return &existing, nil
+	}
+
 	query := `
 		INSERT INTO discovery_features (discovery_id, name, priority, version)
 		VALUES ($1, $2, $3, $4)

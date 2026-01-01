@@ -17,6 +17,7 @@ Examples:
 
 import sys
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -56,24 +57,87 @@ TECH_STACKS = {
     "python-flask": {
         "template_dir": "python-flask",
         "display_name": "Python Flask",
-        "default_port": 5000,
+        "services": [{"name": "flask", "port": 5000, "label": "Flask App"}],
     },
     "python-fastapi": {
         "template_dir": "python-fastapi",
         "display_name": "Python FastAPI",
-        "default_port": 8000,
+        "services": [{"name": "fastapi", "port": 8000, "label": "FastAPI App"}],
     },
     "node-react": {
         "template_dir": "node-react",
         "display_name": "React",
-        "default_port": 3000,
+        "services": [{"name": "react", "port": 3000, "label": "React App"}],
     },
     "node-nextjs": {
         "template_dir": "node-nextjs",
         "display_name": "Next.js",
-        "default_port": 3000,
+        "services": [{"name": "nextjs", "port": 3000, "label": "Next.js App"}],
     },
 }
+
+# Port registry for dynamic service detection
+PORT_REGISTRY = {
+    # Frontend frameworks
+    "nextjs": {"port": 3000, "label": "Next.js App", "category": "frontend"},
+    "react": {"port": 3000, "label": "React App", "category": "frontend"},
+    "vite": {"port": 5173, "label": "Vite Dev Server", "category": "frontend"},
+    "vue": {"port": 5173, "label": "Vue App", "category": "frontend"},
+    "angular": {"port": 4200, "label": "Angular App", "category": "frontend"},
+
+    # Backend frameworks
+    "fastapi": {"port": 8000, "label": "FastAPI Server", "category": "backend"},
+    "flask": {"port": 5000, "label": "Flask App", "category": "backend"},
+    "django": {"port": 8000, "label": "Django Server", "category": "backend"},
+    "express": {"port": 3001, "label": "Express Server", "category": "backend"},
+    "go": {"port": 8080, "label": "Go Server", "category": "backend"},
+    "rust": {"port": 8080, "label": "Rust Server", "category": "backend"},
+    "spring": {"port": 8080, "label": "Spring Boot", "category": "backend"},
+}
+
+
+def detect_services(description: str) -> list[dict]:
+    """Parse project description to detect frontend/backend services."""
+    description_lower = description.lower()
+    detected = []
+
+    patterns = [
+        (r'\bnext\.?js\b', 'nextjs'),
+        (r'\breact\b', 'react'),
+        (r'\bvite\b', 'vite'),
+        (r'\bvue\b', 'vue'),
+        (r'\bangular\b', 'angular'),
+        (r'\bfastapi\b', 'fastapi'),
+        (r'\bflask\b', 'flask'),
+        (r'\bdjango\b', 'django'),
+        (r'\bexpress\b', 'express'),
+        (r'\bgo\b(?:\s+api|\s+backend|\s+server)?', 'go'),
+        (r'\brust\b', 'rust'),
+        (r'\bspring\b', 'spring'),
+    ]
+
+    for pattern, service_name in patterns:
+        if re.search(pattern, description_lower):
+            if service_name in PORT_REGISTRY:
+                detected.append({"name": service_name, **PORT_REGISTRY[service_name]})
+
+    return detected
+
+
+def resolve_port_conflicts(services: list[dict]) -> list[dict]:
+    """Resolve port conflicts by incrementing duplicate ports."""
+    used_ports = set()
+    resolved = []
+
+    for service in services:
+        port = service["port"]
+        while port in used_ports:
+            port += 1
+        used_ports.add(port)
+        resolved.append({**service, "port": port})
+
+    return resolved
+
 
 # Which project types support which devcontainer stacks
 PROJECT_TYPE_STACKS = {
@@ -112,6 +176,60 @@ def get_git_commit_hash(garden_root):
     return "unknown"
 
 
+def get_garden_version(garden_root):
+    """Get the current version of The Garden from VERSION file."""
+    version_file = garden_root / "VERSION"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "unknown"
+
+
+def get_garden_remote_url(garden_root):
+    """Get the git remote URL of The Garden for remote sync support."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=garden_root,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def init_beads(project_dir, project_name):
+    """Initialize .beads directory for execution state tracking.
+
+    Creates the beads structure so projects can use beads immediately
+    without requiring manual 'beads init'.
+    """
+    beads_path = project_dir / ".beads"
+
+    if beads_path.exists():
+        return beads_path  # Already initialized
+
+    beads_path.mkdir(parents=True)
+    (beads_path / "issues.jsonl").touch()
+
+    # Create config matching beads.py structure
+    config = {
+        "version": "1.0.0",
+        "created": datetime.now().isoformat(),
+        "project": project_name,
+        "settings": {
+            "auto_close_children": True,
+            "require_note_on_close": False
+        }
+    }
+    with open(beads_path / "config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+    return beads_path
+
+
 def title_case_name(name):
     """Convert hyphenated name to Title Case for display."""
     return ' '.join(word.capitalize() for word in name.split('-'))
@@ -129,12 +247,16 @@ def generate_agent_table(agents):
 def create_lineage_json(project_dir, garden_root, project_name, project_type, description, agents, tech_stack=None):
     """Create lineage.json to track Garden connection."""
     commit_hash = get_git_commit_hash(garden_root)
+    garden_version = get_garden_version(garden_root)
+    remote_url = get_garden_remote_url(garden_root)
 
     lineage = {
+        "schema_version": "2.1",
         "garden": {
             "source_path": str(garden_root),
             "commit_hash": commit_hash,
-            "version": "2.0"
+            "version": garden_version,
+            "remote_url": remote_url
         },
         "project": {
             "name": project_name,
@@ -159,7 +281,9 @@ def create_lineage_json(project_dir, garden_root, project_name, project_type, de
                 "handoff",
                 "context-display",
                 "agent-session-summary",
-                "setup-validation"
+                "setup-validation",
+                "version-notify",
+                "garden-request"
             ],
             "commands": [
                 "commit.md",
@@ -167,14 +291,22 @@ def create_lineage_json(project_dir, garden_root, project_name, project_type, de
                 "handoff.md",
                 "mr.md",
                 "onboard.md",
-                "sync-baseline.md"
+                "sync-baseline.md",
+                "updates.md",
+                "garden-request.md"
             ],
             "devcontainer": tech_stack is not None
         },
         "sync": {
             "enabled": True,
             "last_sync": None,
+            "last_version": None,
+            "auto_notify": True,
             "excluded_paths": []
+        },
+        "notifications": {
+            "dismissed_versions": [],
+            "last_check": None
         }
     }
 
@@ -311,7 +443,7 @@ def copy_core_structure(garden_root, project_dir, agents):
 
     # Create work/ directory structure without copying contents
     work_dst = project_claude / "work"
-    work_subdirs = ["0_vision", "1_backlog", "2_active", "3_done", "history"]
+    work_subdirs = ["0_vision", "1_backlog", "2_active", "3_done", "history", "garden-requests"]
     for subdir in work_subdirs:
         (work_dst / subdir).mkdir(parents=True, exist_ok=True)
     print(f"  ✅ Created work/ (empty structure)")
@@ -325,6 +457,8 @@ def copy_core_structure(garden_root, project_dir, agents):
         "setup-validation",
         "hooks-setup",
         "workspace-setup",
+        "version-notify",
+        "garden-request",
     ]
 
     skills_src = garden_claude / "skills"
@@ -441,7 +575,7 @@ def merge_to_existing(garden_root, project_dir, agents):
 
     # Create work/ directory structure if doesn't exist
     work_dst = project_claude / "work"
-    work_subdirs = ["0_vision", "1_backlog", "2_active", "3_done", "history"]
+    work_subdirs = ["0_vision", "1_backlog", "2_active", "3_done", "history", "garden-requests"]
     work_created = False
     for subdir in work_subdirs:
         subdir_path = work_dst / subdir
@@ -462,6 +596,8 @@ def merge_to_existing(garden_root, project_dir, agents):
         "setup-validation",
         "hooks-setup",
         "workspace-setup",
+        "version-notify",
+        "garden-request",
     ]
 
     skills_src = garden_claude / "skills"
@@ -526,14 +662,15 @@ def merge_to_existing(garden_root, project_dir, agents):
     return project_claude
 
 
-def copy_devcontainer(garden_root, project_dir, project_name, tech_stack):
-    """Copy and customize devcontainer template for the specified tech stack.
+def copy_devcontainer(garden_root, project_dir, project_name, tech_stack, additional_services=None):
+    """Copy and customize devcontainer template with dynamic port configuration.
 
     Args:
         garden_root: Path to The Garden root directory
         project_dir: Path to the new project directory
         project_name: Name of the project (for template substitution)
         tech_stack: Tech stack identifier (e.g., "python-flask")
+        additional_services: Optional list of additional services detected from description
 
     Returns:
         Path to created .devcontainer directory, or None if no stack specified
@@ -545,8 +682,23 @@ def copy_devcontainer(garden_root, project_dir, project_name, tech_stack):
     template_dir = garden_root / ".claude" / "templates" / "devcontainer-templates" / stack_info["template_dir"]
 
     if not template_dir.exists():
-        print(f"  ⚠️  Devcontainer template not found: {tech_stack}")
+        print(f"  Warning: Devcontainer template not found: {tech_stack}")
         return None
+
+    # Combine base services with additional services
+    all_services = list(stack_info.get("services", []))
+    if additional_services:
+        all_services.extend(additional_services)
+
+    # Resolve any port conflicts
+    all_services = resolve_port_conflicts(all_services)
+
+    # Generate port configurations
+    forward_ports = [s["port"] for s in all_services]
+    ports_attributes = {
+        str(s["port"]): {"label": s["label"], "onAutoForward": "notify"}
+        for s in all_services
+    }
 
     # Create .devcontainer directory in project
     devcontainer_dst = project_dir / ".devcontainer"
@@ -561,6 +713,8 @@ def copy_devcontainer(garden_root, project_dir, project_name, tech_stack):
             content = src_file.read_text()
             content = content.replace("{{PROJECT_NAME}}", title_case_name(project_name))
             content = content.replace("{{project_name}}", project_name)
+            content = content.replace("{{FORWARD_PORTS}}", json.dumps(forward_ports))
+            content = content.replace("{{PORTS_ATTRIBUTES}}", json.dumps(ports_attributes, indent=4))
 
             dst_file.write_text(content)
 
@@ -568,7 +722,7 @@ def copy_devcontainer(garden_root, project_dir, project_name, tech_stack):
             if src_file.suffix == ".sh":
                 dst_file.chmod(0o755)
 
-            print(f"  ✅ Created .devcontainer/{src_file.name}")
+            print(f"  Created .devcontainer/{src_file.name}")
 
     return devcontainer_dst
 
@@ -625,6 +779,18 @@ def add_to_existing(project_name, existing_path, project_type, agents, descripti
     except Exception as e:
         print(f"❌ Error creating lineage.json: {e}")
         return None
+
+    # Initialize beads if not present
+    print("\n🔮 Checking beads...")
+    beads_path = project_dir / ".beads"
+    if beads_path.exists():
+        print("  ⏭️  .beads/ already exists")
+    else:
+        try:
+            init_beads(project_dir, project_name)
+            print("  ✅ Created .beads/ (execution state tracking)")
+        except Exception as e:
+            print(f"⚠️  Could not initialize beads: {e}")
 
     # Create CLAUDE.md (overwrites backup we just made)
     print("\n📝 Creating CLAUDE.md...")
@@ -692,7 +858,17 @@ def init_project(project_name, path, project_type, agents, description, tech_sta
     if tech_stack:
         print("\n🐳 Setting up devcontainer...")
         try:
-            copy_devcontainer(garden_root, project_dir, project_name, tech_stack)
+            # Detect additional services from description
+            additional_services = None
+            if description:
+                detected = detect_services(description)
+                # Filter out services that match the primary stack
+                primary_service = TECH_STACKS.get(tech_stack, {}).get("services", [{}])[0].get("name")
+                additional_services = [s for s in detected if s["name"] != primary_service]
+                if additional_services:
+                    print(f"  Detected additional services: {', '.join(s['name'] for s in additional_services)}")
+
+            copy_devcontainer(garden_root, project_dir, project_name, tech_stack, additional_services)
         except Exception as e:
             print(f"⚠️  Error setting up devcontainer: {e}")
             # Non-fatal - continue with project creation
@@ -705,6 +881,15 @@ def init_project(project_name, path, project_type, agents, description, tech_sta
     except Exception as e:
         print(f"❌ Error creating lineage.json: {e}")
         return None
+
+    # Initialize beads for execution state tracking
+    print("\n🔮 Initializing beads...")
+    try:
+        init_beads(project_dir, project_name)
+        print("  ✅ Created .beads/ (execution state tracking)")
+    except Exception as e:
+        print(f"⚠️  Could not initialize beads: {e}")
+        # Non-fatal - continue with project creation
 
     # Create CLAUDE.md
     print("\n📝 Creating CLAUDE.md...")

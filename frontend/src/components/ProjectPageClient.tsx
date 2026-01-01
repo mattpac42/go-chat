@@ -12,7 +12,7 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { useProjects, useProject } from '@/hooks/useProjects';
 import { useFiles } from '@/hooks/useFiles';
 import { usePreviewFiles } from '@/hooks/usePreviewFiles';
-import { Project } from '@/types';
+import { Project, CompletenessReport } from '@/types';
 import { API_BASE_URL } from '@/lib/api';
 
 type RightPanelView = 'files' | 'preview';
@@ -54,6 +54,12 @@ export function ProjectPageClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [rightPanelView, setRightPanelView] = useState<RightPanelView>('files');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [completenessReport, setCompletenessReport] = useState<CompletenessReport | null>(null);
+
+  // Handle completeness report updates from chat
+  const handleCompletenessReport = useCallback((report: CompletenessReport | null) => {
+    setCompletenessReport(report);
+  }, []);
 
   // Load preview files when files change and preview tab is active
   useEffect(() => {
@@ -267,6 +273,7 @@ export function ProjectPageClient() {
             onDiscoveryConfirmed={fetchProjects}
             onRefetchMessages={fetchProject}
             onTitleUpdate={handleTitleUpdate}
+            onCompletenessReport={handleCompletenessReport}
           />
         )}
       </main>
@@ -368,6 +375,7 @@ export function ProjectPageClient() {
         files={previewFiles}
         isOpen={isPreviewModalOpen}
         onClose={() => setIsPreviewModalOpen(false)}
+        completenessReport={completenessReport}
       />
     </div>
   );

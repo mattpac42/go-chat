@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message, ChatState, ServerMessage, ConnectionStatus } from '@/types';
+import { Message, ChatState, ServerMessage, ConnectionStatus, CompletenessReport } from '@/types';
 import { useWebSocket } from './useWebSocket';
 
 interface UseChatOptions {
@@ -16,6 +16,7 @@ interface UseChatReturn {
   error: string | null;
   connectionStatus: ConnectionStatus;
   reconnectAttempts: number;
+  completenessReport: CompletenessReport | null;
   sendMessage: (content: string) => void;
   clearError: () => void;
   reconnect: () => void;
@@ -23,6 +24,32 @@ interface UseChatReturn {
 
 // Delay before showing connection error (to avoid flashing during project switch)
 const CONNECTION_ERROR_DELAY = 800;
+
+// Regex to strip complete discovery metadata tags
+const DISCOVERY_DATA_PATTERN = /<!--DISCOVERY_DATA:[\s\S]*?-->/g;
+
+/**
+ * Get display-safe content by stripping discovery metadata
+ * Handles both complete tags and incomplete tags still being streamed
+ */
+function getDisplayContent(content: string): string {
+  // First, strip any complete discovery metadata tags
+  let result = content.replace(DISCOVERY_DATA_PATTERN, '');
+
+  // Then check for incomplete HTML comment that might be discovery data
+  // This handles the case where we've received "<!--DISCOVERY_DATA:..." but not the closing "-->"
+  const incompleteTagStart = result.lastIndexOf('<!--');
+  if (incompleteTagStart !== -1) {
+    // Check if there's a closing "-->" after this opening
+    const closingTag = result.indexOf('-->', incompleteTagStart);
+    if (closingTag === -1) {
+      // No closing tag yet - this is an incomplete comment, hide it
+      result = result.substring(0, incompleteTagStart);
+    }
+  }
+
+  return result;
+}
 
 /**
  * Chat hook that integrates with WebSocket for real-time messaging
@@ -39,6 +66,7 @@ export function useChat({ projectId, initialMessages = [], onFilesUpdated }: Use
     isLoading: false,
     error: null,
   });
+  const [completenessReport, setCompletenessReport] = useState<CompletenessReport | null>(null);
 
   // Sync initialMessages when they change (e.g., welcome message loaded after discovery)
   // Only update if we have no messages and initialMessages has content
@@ -83,17 +111,22 @@ export function useChat({ projectId, initialMessages = [], onFilesUpdated }: Use
         const streamingMessage = streamingMessageRef.current.get(serverMessage.messageId);
         if (streamingMessage && serverMessage.content) {
           // Accumulate content in the streaming message
+          // Store raw content in ref for complete message assembly
+          const rawContent = streamingMessage.content + serverMessage.content;
           const updatedMessage = {
             ...streamingMessage,
-            content: streamingMessage.content + serverMessage.content,
+            content: rawContent,
           };
           streamingMessageRef.current.set(serverMessage.messageId, updatedMessage);
+
+          // Get display-safe content (strips complete and incomplete metadata)
+          const displayContent = getDisplayContent(rawContent);
 
           setState(prev => ({
             ...prev,
             messages: prev.messages.map(msg =>
               msg.id === serverMessage.messageId
-                ? { ...msg, content: updatedMessage.content }
+                ? { ...msg, content: displayContent }
                 : msg
             ),
           }));
@@ -104,13 +137,15 @@ export function useChat({ projectId, initialMessages = [], onFilesUpdated }: Use
       case 'message_complete': {
         // Finalize the streaming message
         streamingMessageRef.current.delete(serverMessage.messageId);
+        // Strip any metadata from final content
+        const finalContent = getDisplayContent(serverMessage.fullContent || '');
         setState(prev => ({
           ...prev,
           messages: prev.messages.map(msg =>
             msg.id === serverMessage.messageId
               ? {
                   ...msg,
-                  content: serverMessage.fullContent || msg.content,
+                  content: finalContent || msg.content,
                   isStreaming: false,
                   agentType: serverMessage.agentType || msg.agentType,
                 }
@@ -118,6 +153,10 @@ export function useChat({ projectId, initialMessages = [], onFilesUpdated }: Use
           ),
           isLoading: false,
         }));
+        // Update completeness report if provided
+        if (serverMessage.completenessReport) {
+          setCompletenessReport(serverMessage.completenessReport);
+        }
         break;
       }
 
@@ -267,6 +306,7 @@ export function useChat({ projectId, initialMessages = [], onFilesUpdated }: Use
     error: state.error,
     connectionStatus,
     reconnectAttempts,
+    completenessReport,
     sendMessage,
     clearError,
     reconnect,

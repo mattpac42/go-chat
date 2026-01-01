@@ -3,6 +3,9 @@
 .claude/.context-ab-test.jsonl
 .claude/settings.local.json
 
+# Claude Code session data (persisted across devcontainer rebuilds)
+.devcontainer/.claude-data/
+
 # OS Files
 .DS_Store
 *.swp

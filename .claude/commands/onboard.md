@@ -32,17 +32,54 @@
    - Extract project name from git remote (if available)
    - Identify project type/purpose from README or package.json
 
-3. **Initialize VS Code Workspace**
+3. **Initialize Execution State (Beads)**
+
+   Check if beads is initialized for execution state tracking:
+
+   ```bash
+   # Check if .beads/ exists
+   ls -la .beads/ 2>/dev/null
+   ```
+
+   **If .beads/ doesn't exist**:
+   ```
+   🔮 Initializing beads for execution state tracking...
+   ```
+
+   Initialize beads:
+   ```bash
+   python3 .claude/skills/beads/scripts/beads.py init
+   ```
+
+   **If .beads/ already exists**:
+   ```
+   ✅ Beads already initialized
+   ```
+
+   **On success**:
+   ```
+   ✅ Beads initialized!
+      - .beads/issues.jsonl - Issue storage
+      - .beads/config.json - Configuration
+
+   You can now use beads for tracking work:
+      beads add "Task title"     - Create new task
+      beads context              - Show current work
+      beads progress <id>        - Mark task in-progress
+      beads close <id>           - Complete a task
+   ```
+
+4. **Initialize VS Code Workspace**
    - Check if `.vscode/settings.json` exists
    - If not, create `.vscode/` directory
    - Copy `.claude/templates/vscode-settings-template.json` to `.vscode/settings.json`
 
-4. **Analyze Current Color Scheme**
+5. **Analyze Current Color Scheme**
    - Read `.vscode/settings.json`
    - Extract current primary and secondary colors
    - Check if colors are still default template (Green: `#22c55e`/`#166534`, Brown: `#78350f`/`#d97706`)
 
-5. **Determine Theme to Apply**
+6. **Determine Theme to Apply**
 
    **If two color arguments provided** (e.g., `/onboard red blue`):
    - Use first argument as primary color
@@ -64,7 +101,7 @@
      - B) Choose from 10+ example color pairings
      - C) Keep current colors
 
-6. **Apply Color Scheme**
+7. **Apply Color Scheme**
    - If user selects a theme, update `.vscode/settings.json`
    - Replace all 7 color instances:
      - Primary bright (line 8)
@@ -75,7 +112,7 @@
      - Theme name comment (line 3)
    - Confirm completion with theme name and colors
 
-7. **Populate Completion One-Liners**
+8. **Populate Completion One-Liners**
 
    Generate 100 creative, witty, or humorous one-liners themed around the project name for the audio completion hook. The one-liners must contain most of the words of the title.
 
@@ -150,7 +187,7 @@
       You'll hear a random witty phrase each time Claude finishes a response.
       ```
 
-8. **Success Confirmation**
+9. **Success Confirmation**
    ```
    ✅ Workspace colors updated to [Theme Name]!
    - Primary: [Color Name] (#hexcode)
@@ -161,7 +198,7 @@
    Reload VS Code to see the new theme.
    ```
 
-9. **Product Vision Discovery (Optional)**
+10. **Product Vision Discovery (Optional)**
 
    Determine if the project needs a product vision document.
 
@@ -259,9 +296,9 @@
       Moving to technical project setup...
       ```
 
-   4. **Proceed to Step 10** (Project Context Discovery)
+   4. **Proceed to Step 11** (Project Context Discovery)
 
-10. **Project Context Discovery**
+11. **Project Context Discovery**
 
    Check if PROJECT_CONTEXT.md needs to be populated:
 
@@ -331,9 +368,9 @@
       Moving to agent selection...
       ```
 
-   6. **Proceed to Step 11** (Agent Selection)
+   6. **Proceed to Step 12** (Agent Selection)
 
-11. **Agent Selection (Hiring Your Team)**
+12. **Agent Selection (Hiring Your Team)**
 
    Based on PRODUCT_VISION.md and PROJECT_CONTEXT.md, recommend and copy specialized agents from the marketplace library.
 
@@ -595,6 +632,7 @@
 
 ## Success Criteria
 
+- Beads initialized (or already exists)
 - Project name detected correctly
 - Current color scheme analyzed
 - Appropriate theme suggested (if keywords match)

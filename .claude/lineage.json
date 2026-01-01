@@ -1,8 +1,9 @@
 {
   "garden": {
     "source_path": "/Users/mattpacione/git/the_garden/the_garden",
-    "commit_hash": "42c8f799",
-    "version": "2.0"
+    "remote_url": "https://github.com/mattpac42/the_garden",
+    "commit_hash": "2e2edd5",
+    "version": "3.3.0"
   },
   "project": {
     "name": "go-chat",
@@ -37,7 +38,8 @@
       "handoff",
       "context-display",
       "agent-session-summary",
-      "setup-validation"
+      "setup-validation",
+      "version-notify"
     ],
     "commands": [
       "commit.md",
@@ -45,13 +47,14 @@
       "handoff.md",
       "mr.md",
       "onboard.md",
-      "sync-baseline.md"
+      "sync-baseline.md",
+      "updates.md"
     ],
     "devcontainer": true
   },
   "sync": {
     "enabled": true,
-    "last_sync": null,
+    "last_sync": "2026-01-01T12:00:00.000000",
     "excluded_paths": []
   }
 }

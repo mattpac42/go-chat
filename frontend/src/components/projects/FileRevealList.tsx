@@ -165,16 +165,20 @@ function FunctionalGroupSection({
 
   // Color mapping for functional groups
   const groupColors: Record<string, string> = {
-    'Homepage': 'bg-blue-50 text-blue-700 border-blue-200',
+    'User Interface': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Application Logic': 'bg-purple-50 text-purple-700 border-purple-200',
     'Navigation': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    'Contact Form': 'bg-green-50 text-green-700 border-green-200',
-    'About Page': 'bg-purple-50 text-purple-700 border-purple-200',
     'Backend Services': 'bg-orange-50 text-orange-700 border-orange-200',
     'Database': 'bg-red-50 text-red-700 border-red-200',
-    'Configuration': 'bg-gray-100 text-gray-700 border-gray-200',
+    'Configuration': 'bg-slate-100 text-slate-700 border-slate-200',
     'Documentation': 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    'Testing': 'bg-green-50 text-green-700 border-green-200',
+    'Scripts': 'bg-amber-50 text-amber-700 border-amber-200',
+    // Legacy/specific groups
+    'Homepage': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Contact Form': 'bg-green-50 text-green-700 border-green-200',
+    'About Page': 'bg-purple-50 text-purple-700 border-purple-200',
     'UI Components': 'bg-pink-50 text-pink-700 border-pink-200',
-    'User Interface': 'bg-cyan-50 text-cyan-700 border-cyan-200',
     'Pages': 'bg-teal-50 text-teal-700 border-teal-200',
   };
 
@@ -238,18 +242,23 @@ function groupFilesByFunction(nodes: FileNode[]): Map<string, FileNode[]> {
   const files = flattenFileTree(nodes);
   const groups = new Map<string, FileNode[]>();
 
-  // Define group order for consistent display
+  // Define group order for consistent display (most relevant first)
   const groupOrder = [
-    'Homepage',
+    'User Interface',
+    'Application Logic',
     'Navigation',
+    'Backend Services',
+    'Database',
+    'Configuration',
+    'Testing',
+    'Scripts',
+    'Documentation',
+    // Legacy/specific groups
+    'Homepage',
     'Contact Form',
     'About Page',
     'UI Components',
     'Pages',
-    'Backend Services',
-    'Database',
-    'Configuration',
-    'Documentation',
     'Other',
   ];
 

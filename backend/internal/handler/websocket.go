@@ -33,12 +33,13 @@ type WebSocketMessage struct {
 
 // MessageCompleteResponse is sent when a message stream is complete.
 type MessageCompleteResponse struct {
-	Type        string            `json:"type"`
-	MessageID   string            `json:"messageId"`
-	FullContent string            `json:"fullContent"`
-	CodeBlocks  []model.CodeBlock `json:"codeBlocks"`
-	AgentType   *string           `json:"agentType,omitempty"`
-	Timestamp   time.Time         `json:"timestamp"`
+	Type               string                    `json:"type"`
+	MessageID          string                    `json:"messageId"`
+	FullContent        string                    `json:"fullContent"`
+	CodeBlocks         []model.CodeBlock         `json:"codeBlocks"`
+	AgentType          *string                   `json:"agentType,omitempty"`
+	CompletenessReport *model.CompletenessReport `json:"completenessReport,omitempty"`
+	Timestamp          time.Time                 `json:"timestamp"`
 }
 
 // ErrorResponse is sent when an error occurs.
@@ -178,8 +179,8 @@ func (h *WebSocketHandler) handleChatMessage(ctx context.Context, conn *websocke
 		return
 	}
 
-	// Send message_complete with code blocks and agent type
-	h.sendMessageComplete(conn, mu, messageID, result.Content, result.CodeBlocks, result.AgentType)
+	// Send message_complete with code blocks, agent type, and completeness report
+	h.sendMessageComplete(conn, mu, messageID, result.Content, result.CodeBlocks, result.AgentType, result.CompletenessReport)
 }
 
 func (h *WebSocketHandler) sendMessageStart(conn *websocket.Conn, mu *sync.Mutex, messageID string) {
@@ -194,17 +195,18 @@ func (h *WebSocketHandler) sendMessageStart(conn *websocket.Conn, mu *sync.Mutex
 	conn.WriteJSON(startMsg)
 }
 
-func (h *WebSocketHandler) sendMessageComplete(conn *websocket.Conn, mu *sync.Mutex, messageID string, content string, codeBlocks []model.CodeBlock, agentType *string) {
+func (h *WebSocketHandler) sendMessageComplete(conn *websocket.Conn, mu *sync.Mutex, messageID string, content string, codeBlocks []model.CodeBlock, agentType *string, completenessReport *model.CompletenessReport) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	completeMsg := MessageCompleteResponse{
-		Type:        "message_complete",
-		MessageID:   messageID,
-		FullContent: content,
-		CodeBlocks:  codeBlocks,
-		AgentType:   agentType,
-		Timestamp:   time.Now().UTC(),
+		Type:               "message_complete",
+		MessageID:          messageID,
+		FullContent:        content,
+		CodeBlocks:         codeBlocks,
+		AgentType:          agentType,
+		CompletenessReport: completenessReport,
+		Timestamp:          time.Now().UTC(),
 	}
 	conn.WriteJSON(completeMsg)
 }

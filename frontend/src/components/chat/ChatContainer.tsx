@@ -14,7 +14,7 @@ import { DiscoveryProgress, DiscoveryStageDrawer } from '@/components/discovery'
 import { DiscoverySummaryModal } from '@/components/discovery/DiscoverySummaryModal';
 import { CostSavingsIcon } from '@/components/savings';
 import { WageSettingsModal } from '@/components/settings';
-import { Message } from '@/types';
+import { Message, CompletenessReport } from '@/types';
 
 interface ChatContainerProps {
   projectId: string;
@@ -26,6 +26,7 @@ interface ChatContainerProps {
   onDiscoveryConfirmed?: () => void;
   onRefetchMessages?: () => Promise<void>;
   onTitleUpdate?: (newTitle: string) => Promise<void>;
+  onCompletenessReport?: (report: CompletenessReport | null) => void;
 }
 
 export function ChatContainer({
@@ -38,6 +39,7 @@ export function ChatContainer({
   onDiscoveryConfirmed,
   onRefetchMessages,
   onTitleUpdate,
+  onCompletenessReport,
 }: ChatContainerProps) {
   const {
     messages,
@@ -45,6 +47,7 @@ export function ChatContainer({
     error,
     connectionStatus,
     reconnectAttempts,
+    completenessReport,
     sendMessage,
     clearError,
     reconnect,
@@ -53,6 +56,11 @@ export function ChatContainer({
     initialMessages,
     onFilesUpdated,
   });
+
+  // Notify parent when completeness report changes
+  useEffect(() => {
+    onCompletenessReport?.(completenessReport);
+  }, [completenessReport, onCompletenessReport]);
 
   // Discovery integration
   const {
