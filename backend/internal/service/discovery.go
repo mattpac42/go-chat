@@ -709,6 +709,7 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 		update.ProjectName = &pn
 		hasUpdates = true
 	} else if summary, ok := extracted["summary"].(map[string]interface{}); ok {
+		s.logger.Debug().Interface("summary", summary).Msg("checking nested summary object for project_name")
 		if pn, ok := summary["project_name"].(string); ok && pn != "" {
 			s.logger.Info().Str("project_name", pn).Msg("found project_name in summary")
 			update.ProjectName = &pn
@@ -720,15 +721,18 @@ func (s *DiscoveryService) processExtractedData(ctx context.Context, discovery *
 	if update.ProjectName == nil && discovery.Stage == model.StageSummary {
 		s.logger.Warn().
 			Interface("extracted", extracted).
-			Msg("project_name not found in summary stage metadata")
+			Msg("project_name not found in summary stage metadata - check if Claude included nested summary object")
 	}
 
 	// Extract solves statement (check top-level and nested under "summary")
 	if ss, ok := extracted["solves_statement"].(string); ok && ss != "" {
+		s.logger.Info().Str("solves_statement", ss).Msg("found solves_statement at top level")
 		update.SolvesStatement = &ss
 		hasUpdates = true
 	} else if summary, ok := extracted["summary"].(map[string]interface{}); ok {
+		s.logger.Debug().Interface("summary", summary).Msg("checking nested summary object for solves_statement")
 		if ss, ok := summary["solves_statement"].(string); ok && ss != "" {
+			s.logger.Info().Str("solves_statement", ss).Msg("found solves_statement in summary")
 			update.SolvesStatement = &ss
 			hasUpdates = true
 		}
