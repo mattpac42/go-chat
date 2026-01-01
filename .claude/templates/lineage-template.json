@@ -1,8 +1,10 @@
 {
+  "schema_version": "2.1",
   "garden": {
     "source_path": "{garden_path}",
     "commit_hash": "{commit_hash}",
-    "version": "2.0"
+    "version": "{garden_version}",
+    "remote_url": null
   },
   "project": {
     "name": "{project_name}",
@@ -27,7 +29,9 @@
       "handoff",
       "context-display",
       "agent-session-summary",
-      "setup-validation"
+      "setup-validation",
+      "version-notify",
+      "garden-request"
     ],
     "commands": [
       "commit.md",
@@ -35,13 +39,21 @@
       "handoff.md",
       "mr.md",
       "onboard.md",
-      "sync-baseline.md"
+      "sync-baseline.md",
+      "updates.md",
+      "garden-request.md"
     ],
     "devcontainer": false
   },
   "sync": {
     "enabled": true,
     "last_sync": null,
+    "last_version": null,
+    "auto_notify": true,
     "excluded_paths": []
+  },
+  "notifications": {
+    "dismissed_versions": [],
+    "last_check": null
   }
 }

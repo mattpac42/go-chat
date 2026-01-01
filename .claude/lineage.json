@@ -2,8 +2,8 @@
   "garden": {
     "source_path": "/Users/mattpacione/git/the_garden/the_garden",
     "remote_url": "https://github.com/mattpac42/the_garden",
-    "commit_hash": "2e2edd5",
-    "version": "3.3.0"
+    "commit_hash": "312cef7",
+    "version": "3.4.0"
   },
   "project": {
     "name": "go-chat",
@@ -54,7 +54,7 @@
   },
   "sync": {
     "enabled": true,
-    "last_sync": "2026-01-01T12:00:00.000000",
+    "last_sync": "2026-01-01T18:30:00.000000",
     "excluded_paths": []
   }
 }

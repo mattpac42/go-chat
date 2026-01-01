@@ -9,11 +9,15 @@ Configure Claude Code hooks for automated workflow enhancements.
 
 ## What This Configures
 
-**Hook 1: UserPromptSubmit** (Context Tracking)
+**Hook 1: UserPromptSubmit** (Version Check + Context Tracking)
 - Runs at the start of each user message
-- Shows context usage with emoji visualization
-- Triggers automatic handoff at 75% threshold
-- Uses `.claude/scripts/context-tracker.py --show-ab`
+- **Version Check**: Checks for Garden updates (throttled to once per 24h)
+  - Uses `.claude/skills/version-notify/scripts/quick-check.sh`
+  - Updates `lineage.json` timestamp to prevent repeated checks
+  - Silent if up-to-date or Garden not accessible
+- **Context Tracking**: Shows context usage with emoji visualization
+  - Triggers automatic handoff at 75% threshold
+  - Uses `.claude/scripts/context-tracker.py --show-ab`
 
 **Hook 2: Stop** (Completion Notification)
 - Runs when Claude finishes a response
@@ -45,22 +49,20 @@ Add this to `.claude/settings.json`:
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/scripts/context-tracker.py --show-ab"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/skills/version-notify/scripts/quick-check.sh 2>/dev/null || true"
           }
         ]
       }
     ],
     "Stop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/scripts/completion-status.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/completion-status.sh 2>/dev/null || true"
           }
         ]
       }

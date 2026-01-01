@@ -4,10 +4,13 @@
 #
 # Usage: Run from project root at session start
 # Exit codes: 0 = no update or inaccessible, 1 = update available
+#
+# Time throttling: Only checks once per 24 hours to avoid noise
 
 set -e
 
 LINEAGE=".claude/lineage.json"
+THROTTLE_HOURS=24
 
 # Check if lineage.json exists
 if [[ ! -f "$LINEAGE" ]]; then
@@ -29,6 +32,36 @@ AUTO_NOTIFY=$(jq -r '.sync.auto_notify // true' "$LINEAGE" 2>/dev/null)
 if [[ "$AUTO_NOTIFY" == "false" ]]; then
     exit 0
 fi
+
+# Time throttling: check if we've checked recently
+LAST_CHECK=$(jq -r '.notifications.last_check // empty' "$LINEAGE" 2>/dev/null)
+if [[ -n "$LAST_CHECK" && "$LAST_CHECK" != "null" ]]; then
+    # Parse last check timestamp and compare with now
+    # Works on both macOS and Linux
+    if date --version &>/dev/null 2>&1; then
+        # GNU date (Linux)
+        LAST_CHECK_EPOCH=$(date -d "$LAST_CHECK" +%s 2>/dev/null || echo 0)
+    else
+        # BSD date (macOS)
+        LAST_CHECK_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${LAST_CHECK%%.*}" +%s 2>/dev/null || echo 0)
+    fi
+    NOW_EPOCH=$(date +%s)
+    HOURS_SINCE=$(( (NOW_EPOCH - LAST_CHECK_EPOCH) / 3600 ))
+
+    if [[ $HOURS_SINCE -lt $THROTTLE_HOURS ]]; then
+        # Checked recently, skip
+        exit 0
+    fi
+fi
+
+# Function to update last_check timestamp
+update_last_check() {
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    # Update lineage.json with new timestamp
+    local tmp_file="${LINEAGE}.tmp"
+    jq ".notifications.last_check = \"$timestamp\"" "$LINEAGE" > "$tmp_file" 2>/dev/null && mv "$tmp_file" "$LINEAGE"
+}
 
 # Function to get latest version from local path
 get_local_version() {
@@ -66,10 +99,13 @@ if [[ -z "$LATEST_VERSION" ]]; then
     LATEST_VERSION=$(get_remote_version 2>/dev/null || true)
 fi
 
-# If we couldn't get a version, exit silently
+# If we couldn't get a version, exit silently (don't update timestamp - Garden not accessible)
 if [[ -z "$LATEST_VERSION" ]]; then
     exit 0
 fi
+
+# We successfully checked - update the timestamp for throttling
+update_last_check
 
 # Compare versions (simple string comparison works for semver)
 if [[ "$CURRENT_VERSION" == "unknown" || "$CURRENT_VERSION" != "$LATEST_VERSION" ]]; then
